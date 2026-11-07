@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.blackx16.tensorainode">
+
+    <!-- WHY: Android 17 (API 37) enforces Local Network Protections; ACCESS_LOCAL_NETWORK is
+         mandatory to bind a ServerSocket and accept incoming Wi-Fi LAN requests from other devices. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!-- WHY: Keep the local Wi-Fi OpenAI server running without Doze or 6-hour mediaProcessing timeouts. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- WHY: Needed for on-device microphone voice testing in the direct test console. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- WHY: Use Android's built-in system NoActionBar theme instead of AppCompat/Material
+         to save ~4-8 MB of UI framework heap and keep frontend memory near zero. -->
+    <application
+        android:allowBackup="false"
+        android:label="TensorAI Node (Pixel 6a)"
+        android:supportsRtl="true"
+        android:largeHeap="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+        <!-- WHY: On Android 12-17, the linker namespace blocks dlopen("libOpenCL.so") unless both
+             libvndksupport.so and libOpenCL.so are declared here. This unlocks the Pixel 6a's
+             20-core Mali-G78 MP20 GPU for LiteRT GPU acceleration. -->
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".server.AiHostForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Hosts a local LAN OpenAI-compatible inference server over Wi-Fi for nearby devices." />
+        </service>
+    </application>
+</manifest>

@@ -1,0 +1,17 @@
+name: Pixel 6a Android 17 CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  verify-native-and-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Zero Bundled Model Weights in Repository
+        run: |
+          ! find . -name "*.litertlm" -o -name "*.tflite" -o -name "*.onnx" | grep -q .
