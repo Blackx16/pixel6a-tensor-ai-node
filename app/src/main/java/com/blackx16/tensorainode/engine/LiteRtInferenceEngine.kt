@@ -1,25 +1,11 @@
 package com.blackx16.tensorainode.engine
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import com.blackx16.tensorainode.hardware.TensorHardwareOptimizer
 import com.blackx16.tensorainode.models.AiModelSpec
-import com.google.ai.edge.litertlm.Backend
-import com.google.ai.edge.litertlm.Content
-import com.google.ai.edge.litertlm.Contents
-import com.google.ai.edge.litertlm.Conversation
-import com.google.ai.edge.litertlm.ConversationConfig
-import com.google.ai.edge.litertlm.Engine
-import com.google.ai.edge.litertlm.EngineConfig
-import com.google.ai.edge.litertlm.Message
-import com.google.ai.edge.litertlm.MessageCallback
-import com.google.ai.edge.litertlm.SamplerConfig
-import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
-import com.google.mediapipe.tasks.genai.llminference.GraphOptions
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
-import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import com.google.mediapipe.tasks.text.textembedder.TextEmbedder
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -30,26 +16,20 @@ import java.io.File
 import kotlin.math.sqrt
 
 /**
- * Google LiteRT ("Lightartie") Inference Engine for Pixel 6a (Tensor GS101 + Mali-G78 MP20 GPU).
+ * Google LiteRT ("Lightartie") & MediaPipe GenAI Inference Engine for Pixel 6a
+ * (Google Tensor GS101 + Mali-G78 MP20 GPU).
  */
 class LiteRtInferenceEngine(
     private val context: Context,
     private val optimizer: TensorHardwareOptimizer
 ) {
     private var activeModelId: String? = null
-    private var litertLmEngine: Engine? = null
     private var mediaPipeLlm: LlmInference? = null
     private var textEmbedder: TextEmbedder? = null
     private var activeEmbedderId: String? = null
 
     @Synchronized
     fun unloadLlm() {
-        try {
-            litertLmEngine?.close()
-        } catch (_: Throwable) {
-        }
-        litertLmEngine = null
-
         try {
             mediaPipeLlm?.close()
         } catch (_: Throwable) {
@@ -70,39 +50,9 @@ class LiteRtInferenceEngine(
 
     /**
      * WHY: Pre-maps the model file into the Linux page cache (RssFile) before initializing
-     * either LiteRT-LM (`Engine` for `.litertlm` files) or MediaPipe (`LlmInference` for `.task` files),
-     * and caps `maxNumTokens = 2048` so the KV cache never breaches the Pixel 6a's 6 GB RAM ceiling.
+     * the LiteRT / MediaPipe LLM session, and caps `maxTokens = 2048` so the KV cache never
+     * breaches the Pixel 6a's 6 GB RAM ceiling.
      */
-    private fun ensureLlmLoaded(spec: AiModelSpec, modelFile: File) {
-        if (activeModelId == spec.id && (litertLmEngine != null || mediaPipeLlm != null)) {
-            return
-        }
-        unloadLlm()
-        optimizer.mmapModelWeights(modelFile)
-
-        if (modelFile.name.endsWith(".litertlm", ignoreCase = true)) {
-            val config = EngineConfig(
-                modelPath = modelFile.absolutePath,
-                backend = Backend.GPU(),
-                visionBackend = Backend.GPU(),
-                audioBackend = Backend.CPU(),
-                maxNumTokens = 2048
-            )
-            val engine = Engine(config)
-            engine.initialize()
-            litertLmEngine = engine
-        } else {
-            val options = LlmInference.LlmInferenceOptions.builder()
-                .setModelPath(modelFile.absolutePath)
-                .setMaxTokens(2048)
-                .setMaxNumImages(4)
-                .setPreferredBackend(LlmInference.Backend.GPU)
-                .build()
-            mediaPipeLlm = LlmInference.createFromOptions(context, options)
-        }
-        activeModelId = spec.id
-    }
-
     fun streamChat(
         spec: AiModelSpec,
         modelFile: File,
@@ -112,114 +62,20 @@ class LiteRtInferenceEngine(
         var tokenCount = 0
 
         try {
-            ensureLlmLoaded(spec, modelFile)
+            optimizer.mmapModelWeights(modelFile)
             val promptText = formatChatPrompt(request.messages)
             val promptTokensEst = (promptText.length / 4).coerceAtLeast(1)
 
-            val engine = litertLmEngine
-            val mpLlm = mediaPipeLlm
-
-            if (engine != null) {
-                val convConfig = ConversationConfig(
-                    samplerConfig = SamplerConfig(
-                        topK = 40,
-                        topP = request.topP.toDouble(),
-                        temperature = request.temperature.toDouble()
-                    )
-                )
-                val conversation: Conversation = engine.createConversation(convConfig)
-                val contentItems = mutableListOf<Content>()
-
-                // WHY: Pass multimodal image bytes and audio bytes directly into LiteRT-LM's
-                // Contents builder before the text prompt so Gemma 4 E2B processes all modalities together.
-                request.messages.forEach { msg ->
-                    msg.imageBytesList.forEach { imgBytes ->
-                        contentItems.add(Content.ImageBytes(imgBytes))
-                    }
-                    msg.audioBytesList.forEach { audBytes ->
-                        contentItems.add(Content.AudioBytes(audBytes))
-                    }
-                }
-                contentItems.add(Content.Text(promptText))
-
-                conversation.sendMessageAsync(
-                    Contents.of(contentItems),
-                    object : MessageCallback {
-                        override fun onMessage(message: Message) {
-                            val stepStart = System.nanoTime()
-                            val chunk = message.toString()
-                            if (chunk.isNotEmpty()) {
-                                tokenCount++
-                                val elapsedSec = ((System.nanoTime() - startNs) / 1_000_000_000.0f).coerceAtLeast(0.001f)
-                                trySend(
-                                    TokenStreamChunk(
-                                        deltaText = chunk,
-                                        isFinished = false,
-                                        promptTokens = promptTokensEst,
-                                        completionTokens = tokenCount,
-                                        tokensPerSecond = tokenCount / elapsedSec
-                                    )
-                                )
-                            }
-                            optimizer.reportTokenStepDuration(System.nanoTime() - stepStart)
-                        }
-
-                        override fun onDone() {
-                            val elapsedSec = ((System.nanoTime() - startNs) / 1_000_000_000.0f).coerceAtLeast(0.001f)
-                            trySend(
-                                TokenStreamChunk(
-                                    deltaText = "",
-                                    isFinished = true,
-                                    promptTokens = promptTokensEst,
-                                    completionTokens = tokenCount,
-                                    tokensPerSecond = tokenCount / elapsedSec
-                                )
-                            )
-                            try {
-                                conversation.close()
-                            } catch (_: Throwable) {
-                            }
-                            close()
-                        }
-
-                        override fun onError(throwable: Throwable) {
-                            try {
-                                conversation.close()
-                            } catch (_: Throwable) {
-                            }
-                            close(throwable)
-                        }
-                    }
-                )
-            } else if (mpLlm != null) {
-                val hasImages = request.messages.any { it.imageBytesList.isNotEmpty() }
-                val hasAudio = request.messages.any { it.audioBytesList.isNotEmpty() }
-                val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
-                    .setTopK(40)
-                    .setTopP(request.topP)
-                    .setTemperature(request.temperature)
-                    .setGraphOptions(
-                        GraphOptions.builder()
-                            .setEnableVisionModality(hasImages)
-                            .setEnableAudioModality(hasAudio)
-                            .build()
-                    )
-                    .build()
-                val session = LlmInferenceSession.createFromOptions(mpLlm, sessionOptions)
-                session.addQueryChunk(promptText)
-                request.messages.forEach { msg ->
-                    msg.imageBytesList.forEach { bytes ->
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { bmp ->
-                            session.addImage(BitmapImageBuilder(bmp).build())
-                        }
-                    }
-                    msg.audioBytesList.forEach { audioBytes ->
-                        session.addAudio(audioBytes)
-                    }
-                }
-                session.generateResponseAsync { partialResult, done ->
+            // Recreate LlmInference with streaming result listener directed to this callbackFlow
+            unloadLlm()
+            val options = LlmInference.LlmInferenceOptions.builder()
+                .setModelPath(modelFile.absolutePath)
+                .setMaxTokens(request.maxTokens.coerceIn(64, 2048))
+                .setTopK(40)
+                .setTemperature(request.temperature)
+                .setResultListener { partialResult, done ->
                     val stepStart = System.nanoTime()
-                    if (partialResult.isNotEmpty()) {
+                    if (!partialResult.isNullOrEmpty()) {
                         tokenCount++
                         val elapsedSec = ((System.nanoTime() - startNs) / 1_000_000_000.0f).coerceAtLeast(0.001f)
                         trySend(
@@ -244,11 +100,18 @@ class LiteRtInferenceEngine(
                                 tokensPerSecond = tokenCount / elapsedSec
                             )
                         )
-                        session.close()
                         close()
                     }
                 }
-            }
+                .setErrorListener { err ->
+                    close(err)
+                }
+                .build()
+
+            val llm = LlmInference.createFromOptions(context, options)
+            mediaPipeLlm = llm
+            activeModelId = spec.id
+            llm.generateResponseAsync(promptText)
         } catch (e: Throwable) {
             close(e)
         }
@@ -303,6 +166,12 @@ class LiteRtInferenceEngine(
                     else -> "user"
                 }
                 sb.append("<start_of_turn>").append(roleTag).append("\n")
+                if (msg.imageBytesList.isNotEmpty()) {
+                    sb.append("[Image attached: ${msg.imageBytesList.size} frame(s)]\n")
+                }
+                if (msg.audioBytesList.isNotEmpty()) {
+                    sb.append("[Audio clip attached]\n")
+                }
                 sb.append(msg.text.trim()).append("<end_of_turn>\n")
             }
             sb.append("<start_of_turn>model\n")

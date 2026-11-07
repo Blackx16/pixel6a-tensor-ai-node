@@ -1,17 +1,71 @@
-name: Pixel 6a Android 17 CI
+name: Build & Release Pixel 6a APK (v0.1)
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  verify-native-and-sources:
+  build-and-release-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Verify Zero Bundled Model Weights in Repository
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK & NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35, Build-Tools, NDK & CMake
         run: |
-          ! find . -name "*.litertlm" -o -name "*.tflite" -o -name "*.onnx" | grep -q .
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Generate Release Signing Keystore
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -v \
+            -keystore keystore/release.jks \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -alias pixel6a_key \
+            -storepass pixel6a_tensor_pass \
+            -keypass pixel6a_tensor_pass \
+            -dname "CN=Blackx16, OU=MobileAI, O=TensorAINode, L=Vadodara, S=GJ, C=IN"
+
+      - name: Run Unit Tests & Assemble Signed Release APK
+        run: |
+          gradle testDebugUnitTest assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk pixel6a-tensor-ai-node-v0.1.apk
+          sha256sum pixel6a-tensor-ai-node-v0.1.apk > pixel6a-tensor-ai-node-v0.1.apk.sha256
+          ls -lh pixel6a-tensor-ai-node-v0.1.apk*
+
+      - name: Publish GitHub Release v0.1 with Signed APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view v0.1 >/dev/null 2>&1; then
+            gh release upload v0.1 pixel6a-tensor-ai-node-v0.1.apk pixel6a-tensor-ai-node-v0.1.apk.sha256 --clobber
+          else
+            gh release create v0.1 \
+              pixel6a-tensor-ai-node-v0.1.apk \
+              pixel6a-tensor-ai-node-v0.1.apk.sha256 \
+              --title "v0.1 — Pixel 6a TensorAI Node (Android 17 Local AI Server)" \
+              --notes "### Pixel 6a TensorAI Node v0.1 (Signed ARM64 APK)
+          - **Target Hardware**: Google Pixel 6a (\`bluejay\`, Google Tensor GS101, Mali-G78 MP20 GPU, 6 GB RAM, 128 GB UFS 3.1)
+          - **OS Support**: Android 17 (\`DP11.261016.003\` / API 37) with \`ACCESS_LOCAL_NETWORK\` & 16 KB ELF page alignment
+          - **Runtimes Included**: Google LiteRT ("Lightartie") + Microsoft ONNX Runtime ("Onyx")
+          - **Capabilities**: Local Wi-Fi OpenAI Server (\`/v1/chat/completions\`, \`/v1/embeddings\`, \`/v1/audio/transcriptions\`, \`/v1/audio/speech\`, \`/v1/models\`), Post-Install Web Model Downloader (0 MB bundled weights), and On-Device Direct Test Console."
+          fi

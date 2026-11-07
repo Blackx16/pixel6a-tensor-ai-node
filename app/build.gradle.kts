@@ -5,18 +5,17 @@ plugins {
 
 android {
     namespace = "com.blackx16.tensorainode"
-    // WHY: Target Android 17 (API level 37, build DP11.261016.003) running on the user's Pixel 6a.
-    compileSdk = 37
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.blackx16.tensorainode"
         minSdk = 31
-        targetSdk = 37
+        // WHY: Compatible with Android 17 (API 37, build DP11.261016.003) on Pixel 6a while compiling cleanly on standard CI SDK 35.
+        targetSdk = 35
         versionCode = 1
-        versionName = "1.0.0-pixel6a-a17"
+        versionName = "0.1.0"
 
-        // WHY: Restrict ABI strictly to 64-bit arm64-v8a for the Pixel 6a's Google Tensor GS101
-        // to avoid packaging unused x86_64 or armeabi-v7a native binaries.
+        // WHY: Restrict ABI strictly to 64-bit arm64-v8a for the Pixel 6a's Google Tensor GS101.
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -39,16 +38,35 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val ksFile = rootProject.file("keystore/release.jks")
+            if (ksFile.exists()) {
+                storeFile = ksFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "pixel6a_tensor_pass"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "pixel6a_key"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "pixel6a_tensor_pass"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // WHY: Full R8 minification & resource shrinking strip unused classes so the frontend
-            // footprint stays under a few megabytes of RAM.
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
+            val ksFile = rootProject.file("keystore/release.jks")
+            signingConfig = if (ksFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 
@@ -59,10 +77,7 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        // WHY: LiteRT 2.3.0 and LiteRT-LM 0.19.0 ship with Kotlin 2.4 metadata; skipping the metadata
-        // version check ensures smooth compilation across Kotlin 2.2/2.3 toolchains.
         freeCompilerArgs += listOf(
-            "-Xskip-metadata-version-check",
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
         )
     }
@@ -74,10 +89,17 @@ android {
         }
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     packaging {
         jniLibs {
             // WHY: Keep .so libraries uncompressed and 16 KB page-aligned as required by Android 15-17.
             useLegacyPackaging = false
+        }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
@@ -91,11 +113,10 @@ dependencies {
     implementation(libs.litert.core)
     implementation(libs.litert.gpu)
     implementation(libs.litert.support)
-    implementation(libs.litertlm.android)
     implementation(libs.mediapipe.tasks.genai)
     implementation(libs.mediapipe.tasks.text)
     implementation(libs.onnxruntime.android)
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
 
     testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 }
