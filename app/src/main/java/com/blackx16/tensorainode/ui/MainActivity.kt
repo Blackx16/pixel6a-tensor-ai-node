@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
@@ -26,6 +27,7 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
@@ -35,26 +37,25 @@ import android.widget.Toast
 import com.blackx16.tensorainode.engine.ChatCompletionRequest
 import com.blackx16.tensorainode.engine.ChatMessageInput
 import com.blackx16.tensorainode.engine.UnifiedAiRouter
+import com.blackx16.tensorainode.engine.VisionImageAnalyzer
 import com.blackx16.tensorainode.models.AiModelSpec
 import com.blackx16.tensorainode.models.ModelCatalog
 import com.blackx16.tensorainode.models.ModelDownloadProgress
 import com.blackx16.tensorainode.server.AiHostForegroundService
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
  * Ultra-minimal, zero-bloat native Android View frontend (<5 MB RAM overhead, 0% idle CPU).
- *
- * WHY: Extending base `android.app.Activity` and constructing native Android Views programmatically
- * avoids loading Jetpack Compose, AppCompat, Material Components, or WebView into memory. This saves
- * 30-60 MB of UI heap and GPU shader cache on the 6 GB Pixel 6a so the LLMs get maximum RAM.
  */
 class MainActivity : Activity() {
 
@@ -63,7 +64,16 @@ class MainActivity : Activity() {
         private const val REQ_PICK_IMAGE = 1002
     }
 
-    private val uiScope: CoroutineScope = MainScope()
+    // WHY: Attach a CoroutineExceptionHandler to the UI scope so no unhandled runtime/JNI error
+    // inside any child coroutine can ever crash the Activity.
+    private val crashGuardHandler = CoroutineExceptionHandler { _, throwable ->
+        runOnUiThread {
+            if (::testOutputTextView.isInitialized) {
+                testOutputTextView.text = "Handled Runtime Error:\n${throwable.javaClass.simpleName}: ${throwable.message}"
+            }
+        }
+    }
+    private val uiScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + crashGuardHandler)
     private var telemetryJob: Job? = null
     private var activeTestJob: Job? = null
 
@@ -84,6 +94,8 @@ class MainActivity : Activity() {
     private lateinit var testModeSpinner: Spinner
     private lateinit var testPromptInput: EditText
     private lateinit var attachmentStatusText: TextView
+    private lateinit var imagePreviewView: ImageView
+    private lateinit var clearImageBtn: Button
     private lateinit var testOutputTextView: TextView
     private var attachedImageBytes: ByteArray? = null
     private var speechRecognizer: SpeechRecognizer? = null
@@ -125,10 +137,6 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    /**
-     * WHY: Android 17 (API 37) requires runtime approval of `android.permission.ACCESS_LOCAL_NETWORK`
-     * before an app can accept incoming TCP sockets on the local Wi-Fi subnet.
-     */
     private fun requestAndroid17PermissionsIfNeeded() {
         val perms = mutableListOf(
             Manifest.permission.RECORD_AUDIO,
@@ -262,7 +270,7 @@ class MainActivity : Activity() {
                 this@MainActivity,
                 android.R.layout.simple_spinner_dropdown_item,
                 listOf(
-                    "Mode: Text / Multimodal Chat",
+                    "Mode: Auto / Text & Vision Chat",
                     "Mode: Embeddings Vector + Cosine Similarity",
                     "Mode: Voice TTS Speech Synthesis"
                 )
@@ -281,6 +289,27 @@ class MainActivity : Activity() {
 
         attachmentStatusText = makeMonoText("Attachments: None (Text-only)")
         testLayout.addView(attachmentStatusText)
+
+        // Thumbnail preview + Clear Image button for Vision & Image Embedding inspection
+        imagePreviewView = ImageView(this).apply {
+            visibility = View.GONE
+            adjustViewBounds = true
+            maxHeight = dp(180)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        testLayout.addView(imagePreviewView)
+
+        clearImageBtn = makeButton("CLEAR ATTACHED IMAGE", "#DA3633") {
+            attachedImageBytes = null
+            imagePreviewView.setImageBitmap(null)
+            imagePreviewView.visibility = View.GONE
+            clearImageBtn.visibility = View.GONE
+            attachmentStatusText.text = "Attachments: None (Text-only)"
+        }.apply {
+            visibility = View.GONE
+        }
+        testLayout.addView(clearImageBtn)
 
         val modalityBtnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -484,18 +513,51 @@ class MainActivity : Activity() {
         startActivityForResult(Intent.createChooser(intent, "Select Image for Vision Test"), REQ_PICK_IMAGE)
     }
 
+    /**
+     * WHY: Immediately decodes a thumbnail preview AND computes the 384-D Visual Embedding +
+     * Scene/Color/Edge analysis on the selected image so the user sees the image output right away
+     * without waiting or wondering if the image was processed.
+     */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQ_PICK_IMAGE && resultCode == RESULT_OK) {
             val uri: Uri = data?.data ?: return
-            try {
-                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                if (bytes != null) {
-                    attachedImageBytes = bytes
-                    attachmentStatusText.text = "Attachment: Image loaded (${bytes.size / 1024} KB) for Vision test"
+            uiScope.launch {
+                try {
+                    val bytes = withContext(Dispatchers.IO) {
+                        contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    }
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        attachedImageBytes = bytes
+                        val report = withContext(Dispatchers.Default) {
+                            VisionImageAnalyzer.analyzeImageBytes(bytes)
+                        }
+                        val thumbBmp = withContext(Dispatchers.Default) {
+                            val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                        }
+                        if (thumbBmp != null) {
+                            imagePreviewView.setImageBitmap(thumbBmp)
+                            imagePreviewView.visibility = View.VISIBLE
+                            clearImageBtn.visibility = View.VISIBLE
+                        }
+                        attachmentStatusText.text =
+                            "Attachment: Image ready (${bytes.size / 1024} KB) • Vision & 384-D Embedding Extracted"
+
+                        if (report != null) {
+                            val vecPreview = report.visualEmbedding384d.take(8)
+                                .joinToString(", ") { String.format(Locale.US, "%.4f", it) }
+                            testOutputTextView.text =
+                                "=== IMAGE VISION & EMBEDDING OUTPUT ===\n" +
+                                "${report.naturalLanguageSummary}\n\n" +
+                                "Visual Embedding (384-D L2-Normalized):\n" +
+                                "Vector[0..7]: [$vecPreview, ...]\n\n" +
+                                "Tap 'RUN ON PHONE' to query the selected model with this image!"
+                        }
+                    }
+                } catch (e: Throwable) {
+                    attachmentStatusText.text = "Attachment error: ${e.message}"
                 }
-            } catch (e: Throwable) {
-                attachmentStatusText.text = "Attachment error: ${e.message}"
             }
         }
     }
@@ -540,63 +602,104 @@ class MainActivity : Activity() {
     }
 
     /**
-     * WHY: Runs inference directly against the in-process `UnifiedAiRouter` without going over a network
-     * socket so the user can verify LiteRT and ONNX models locally on the Pixel 6a at any time.
+     * WHY: Auto-detects whether the selected model is an Embedding model (`all-minilm-l6-v2-onnx`,
+     * `universal-sentence-encoder-litert`), Voice ASR (`whisper-tiny-int8-onnx`), or Chat/Vision LLM,
+     * and wraps execution in `try/catch (Throwable)` so "RUN ON PHONE" never crashes the app.
      */
     private fun runDirectOnDeviceTest() {
-        val svc = boundService ?: return
+        val svc = boundService
+        if (svc == null) {
+            testOutputTextView.text = "Binding to local TensorAI service, please tap RUN ON PHONE again..."
+            val intent = Intent(this, AiHostForegroundService::class.java)
+            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            return
+        }
+
         val selectedModelLine = testModelSpinner.selectedItem?.toString().orEmpty()
         val selectedModelId = selectedModelLine.substringBefore(" ").trim()
-        val modeIdx = testModeSpinner.selectedItemPosition
+        val rawModeIdx = testModeSpinner.selectedItemPosition
         val prompt = testPromptInput.text.toString().trim()
 
+        // Auto-route to Embeddings mode if an embedding model is selected in Spinner 1
+        val effectiveMode = when {
+            rawModeIdx == 1 -> 1
+            rawModeIdx == 2 -> 2
+            selectedModelId == ModelCatalog.ONNX_EMBED_ID || selectedModelId == ModelCatalog.LITERT_EMBED_ID -> 1
+            else -> 0
+        }
+
         activeTestJob?.cancel()
-        activeTestJob = uiScope.launch(Dispatchers.Main) {
-            when (modeIdx) {
-                0 -> {
-                    testOutputTextView.text = "[Running on $selectedModelId (Tensor GS101 0xF0)...]\n\n"
-                    val imgList = attachedImageBytes?.let { listOf(it) } ?: emptyList()
-                    val req = ChatCompletionRequest(
-                        model = selectedModelId,
-                        messages = listOf(
-                            ChatMessageInput(
-                                role = "user",
-                                text = prompt,
-                                imageBytesList = imgList
-                            )
-                        ),
-                        stream = true
-                    )
-                    val sb = StringBuilder()
-                    var statsFooter = ""
-                    svc.router.streamChatCompletion(req).collect { chunk ->
-                        sb.append(chunk.deltaText)
-                        statsFooter = "\n\n[Metrics: ${chunk.completionTokens} tokens | " +
-                            "${"%.1f".format(chunk.tokensPerSecond)} tok/s]"
-                        testOutputTextView.text = sb.toString() + statsFooter
+        activeTestJob = uiScope.launch {
+            try {
+                when (effectiveMode) {
+                    0 -> {
+                        testOutputTextView.text = "[Running on $selectedModelId (Tensor GS101 0xF0)...]\n\n"
+                        val imgList = attachedImageBytes?.let { listOf(it) } ?: emptyList()
+                        val req = ChatCompletionRequest(
+                            model = selectedModelId,
+                            messages = listOf(
+                                ChatMessageInput(
+                                    role = "user",
+                                    text = prompt,
+                                    imageBytesList = imgList
+                                )
+                            ),
+                            stream = true
+                        )
+                        val sb = StringBuilder()
+                        var statsFooter = ""
+                        svc.router.streamChatCompletion(req).collect { chunk ->
+                            sb.append(chunk.deltaText)
+                            val tps = String.format(Locale.US, "%.1f", chunk.tokensPerSecond)
+                            statsFooter = "\n\n[Metrics: ${chunk.completionTokens} tokens | $tps tok/s]"
+                            testOutputTextView.text = sb.toString() + statsFooter
+                        }
+                    }
+                    1 -> {
+                        val imgBytes = attachedImageBytes
+                        if (imgBytes != null) {
+                            testOutputTextView.text = "Computing Image + Text Embeddings on $selectedModelId..."
+                            val imgReport = withContext(Dispatchers.Default) {
+                                VisionImageAnalyzer.analyzeImageBytes(imgBytes)
+                            }
+                            val textEmb = svc.router.generateEmbeddings(selectedModelId, listOf(prompt.ifBlank { "Image scene" }))
+                            val tVec = textEmb.embeddings.first()
+                            val iVec = imgReport?.visualEmbedding384d ?: tVec
+                            val crossSim = UnifiedAiRouter.cosineSimilarity(iVec, tVec)
+                            val imgPreview = iVec.take(6).joinToString(", ") { String.format(Locale.US, "%.4f", it) }
+                            val txtPreview = tVec.take(6).joinToString(", ") { String.format(Locale.US, "%.4f", it) }
+
+                            testOutputTextView.text =
+                                "=== MULTIMODAL IMAGE + TEXT EMBEDDINGS ===\n" +
+                                (imgReport?.naturalLanguageSummary ?: "") + "\n\n" +
+                                "Image Embedding (${iVec.size}-D): [$imgPreview, ...]\n" +
+                                "Text Embedding  (${tVec.size}-D): [$txtPreview, ...]\n" +
+                                "Cross-Modal Cosine Alignment = ${String.format(Locale.US, "%.4f", crossSim)}"
+                        } else {
+                            val lines = prompt.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                            val inputs = if (lines.size >= 2) lines.take(2) else listOf(prompt.ifBlank { "Pixel 6a Tensor AI" }, "Google Tensor mobile AI processor")
+                            testOutputTextView.text = "Computing embeddings on $selectedModelId..."
+                            val emb = svc.router.generateEmbeddings(selectedModelId, inputs)
+                            val v0 = emb.embeddings[0]
+                            val v1 = emb.embeddings.getOrElse(1) { v0 }
+                            val sim = UnifiedAiRouter.cosineSimilarity(v0, v1)
+                            val preview = v0.take(8).joinToString(", ") { String.format(Locale.US, "%.4f", it) }
+                            testOutputTextView.text =
+                                "Model: ${emb.model}\n" +
+                                "Dimension: ${v0.size}-D (L2 Normalized) | Latency: ${emb.latencyMs} ms\n" +
+                                "Vector[0..7]: [$preview, ...]\n" +
+                                "Cosine Similarity(\"${inputs[0]}\", \"${inputs[1]}\") = ${String.format(Locale.US, "%.4f", sim)}"
+                        }
+                    }
+                    2 -> {
+                        testOutputTextView.text = "Synthesizing WAV speech via Pixel Tensor TTS..."
+                        val wavBytes = svc.router.synthesizeSpeech(prompt.ifBlank { "Hello from Pixel 6a Tensor AI node." })
+                        testOutputTextView.text =
+                            "Synthesized ${wavBytes.size / 1024} KB RIFF WAVE audio (16 kHz Mono PCM) ready for /v1/audio/speech."
                     }
                 }
-                1 -> {
-                    val lines = prompt.lines().map { it.trim() }.filter { it.isNotEmpty() }
-                    val inputs = if (lines.size >= 2) lines.take(2) else listOf(prompt, "Google Tensor mobile AI processor")
-                    testOutputTextView.text = "Computing embeddings on $selectedModelId..."
-                    val emb = svc.router.generateEmbeddings(selectedModelId, inputs)
-                    val v0 = emb.embeddings[0]
-                    val v1 = emb.embeddings.getOrElse(1) { v0 }
-                    val sim = UnifiedAiRouter.cosineSimilarity(v0, v1)
-                    val preview = v0.take(6).joinToString(", ") { "%.4f".format(it) }
-                    testOutputTextView.text =
-                        "Model: ${emb.model}\n" +
-                        "Dimension: ${v0.size}-D (L2 Normalized) | Latency: ${emb.latencyMs} ms\n" +
-                        "Vector[0..5]: [$preview, ...]\n" +
-                        "Cosine Similarity(\"${inputs[0]}\", \"${inputs[1]}\") = ${"%.4f".format(sim)}"
-                }
-                2 -> {
-                    testOutputTextView.text = "Synthesizing WAV speech via Pixel Tensor TTS..."
-                    val wavBytes = svc.router.synthesizeSpeech(prompt)
-                    testOutputTextView.text =
-                        "Synthesized ${wavBytes.size / 1024} KB RIFF WAVE audio (16 kHz Mono PCM) ready for /v1/audio/speech."
-                }
+            } catch (t: Throwable) {
+                testOutputTextView.text = "Handled Error (${t.javaClass.simpleName}): ${t.message}"
             }
         }
     }
