@@ -27,9 +27,9 @@ import java.util.UUID
  * Ultra-lightweight (<1 MB RAM overhead), zero-dependency OpenAI-compatible HTTP/1.1 Server
  * designed to run on the Pixel 6a's local Wi-Fi interface (`0.0.0.0:<port>`).
  *
- * WHY: Instead of pulling in heavy Netty/Jetty web server dependencies that consume 15-30 MB of
- * RAM and spawn dozens of threads, this custom coroutine socket server runs on the 2-thread
- * Cortex-A55 efficiency core pool (`0x0F` affinity) with near-zero heap overhead.
+ * WHY: Includes W3C Private Network Access (`Access-Control-Allow-Private-Network: true`) and
+ * CORS preflight headers so the GitHub Pages web console (`https://blackx16.github.io/pixel6a-tensor-ai-node/`)
+ * can connect directly over local Wi-Fi, and also serves a built-in redirect/status landing page at `GET /`.
  */
 class OpenAiHttpServer(
     private val router: UnifiedAiRouter,
@@ -93,6 +93,31 @@ class OpenAiHttpServer(
                 return
             }
 
+            if (request.method == "GET" && (request.path == "/" || request.path == "/index.html")) {
+                val wifiIp = router.optimizer.getLocalWifiIpAddress()
+                val html = """
+                    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+                    <title>Pixel 6a TensorAI Node</title></head>
+                    <body style="background:#0b0f17;color:#e6edf3;font-family:monospace;padding:24px;">
+                    <h2 style="color:#58a6ff;">Pixel 6a TensorAI Node is LIVE on Local Wi-Fi</h2>
+                    <p>OpenAI Base URL: <code>http://$wifiIp:$port/v1</code></p>
+                    <p>Web Console (GitHub Pages): <a style="color:#3fb950;" href="https://blackx16.github.io/pixel6a-tensor-ai-node/?host=$wifiIp:$port">https://blackx16.github.io/pixel6a-tensor-ai-node/?host=$wifiIp:$port</a></p>
+                    </body></html>
+                """.trimIndent().toByteArray(Charsets.UTF_8)
+                val headers = buildString {
+                    append("HTTP/1.1 200 OK\r\n")
+                    append("Content-Type: text/html; charset=utf-8\r\n")
+                    append("Content-Length: ${html.size}\r\n")
+                    append("Access-Control-Allow-Origin: *\r\n")
+                    append("Access-Control-Allow-Private-Network: true\r\n")
+                    append("Connection: close\r\n\r\n")
+                }
+                output.write(headers.toByteArray(Charsets.UTF_8))
+                output.write(html)
+                output.flush()
+                return
+            }
+
             if (request.path == "/health") {
                 val mem = router.optimizer.readMemoryTelemetry()
                 val healthJson = JSONObject()
@@ -107,7 +132,6 @@ class OpenAiHttpServer(
                 return
             }
 
-            // WHY: Enforce standard OpenAI `Authorization: Bearer <api_key>` format for all `/v1/*` routes.
             if (!isAuthorized(request.headers["authorization"], apiKey)) {
                 val err = buildOpenAiError(
                     "Invalid or missing Bearer API key. Pass header 'Authorization: Bearer $apiKey'.",
@@ -192,14 +216,13 @@ class OpenAiHttpServer(
         val resolvedSpec = router.resolveChatModel(chatReq.model)
 
         if (chatReq.stream) {
-            // WHY: Flush each token immediately as an OpenAI Server-Sent Event (`data: {...}\n\n`)
-            // so external LAN clients receive real-time token streaming over Wi-Fi.
             val sseHeaders = buildString {
                 append("HTTP/1.1 200 OK\r\n")
                 append("Content-Type: text/event-stream; charset=utf-8\r\n")
                 append("Cache-Control: no-cache\r\n")
                 append("Connection: keep-alive\r\n")
-                append("Access-Control-Allow-Origin: *\r\n\r\n")
+                append("Access-Control-Allow-Origin: *\r\n")
+                append("Access-Control-Allow-Private-Network: true\r\n\r\n")
             }
             output.write(sseHeaders.toByteArray(Charsets.UTF_8))
             output.flush()
@@ -381,6 +404,7 @@ class OpenAiHttpServer(
             append("Content-Type: audio/wav\r\n")
             append("Content-Length: ${wavBytes.size}\r\n")
             append("Access-Control-Allow-Origin: *\r\n")
+            append("Access-Control-Allow-Private-Network: true\r\n")
             append("Connection: close\r\n\r\n")
         }
         output.write(headers.toByteArray(Charsets.UTF_8))
@@ -396,10 +420,6 @@ class OpenAiHttpServer(
             val body: ByteArray
         )
 
-        /**
-         * WHY: Constant-time comparison (`MessageDigest.isEqual`) prevents timing side-channel
-         * leaks when verifying Bearer API keys over local Wi-Fi.
-         */
         fun isAuthorized(authHeader: String?, expectedApiKey: String): Boolean {
             if (expectedApiKey.isBlank()) return true
             if (authHeader.isNullOrBlank()) return false
@@ -585,6 +605,7 @@ class OpenAiHttpServer(
                 append("Access-Control-Allow-Origin: *\r\n")
                 append("Access-Control-Allow-Headers: Authorization, Content-Type\r\n")
                 append("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n")
+                append("Access-Control-Allow-Private-Network: true\r\n")
                 append("Connection: close\r\n\r\n")
             }
             output.write(headers.toByteArray(Charsets.UTF_8))

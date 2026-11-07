@@ -1,4 +1,4 @@
-name: Build & Release Pixel 6a APK (v0.1 & v0.2)
+name: Build APK & Deploy GitHub Pages Web Console
 
 on:
   push:
@@ -7,8 +7,38 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
+  deploy-github-pages:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Enable & Configure GitHub Pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X POST /repos/${{ github.repository }}/pages -f build_type=workflow || \
+          gh api -X PUT /repos/${{ github.repository }}/pages -f build_type=workflow || true
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Web Console Artifact (docs/)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'docs'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
   build-and-release-apk:
     runs-on: ubuntu-latest
     steps:
@@ -53,28 +83,14 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk pixel6a-tensor-ai-node-v0.2.apk
           sha256sum pixel6a-tensor-ai-node-v0.1.apk > pixel6a-tensor-ai-node-v0.1.apk.sha256
           sha256sum pixel6a-tensor-ai-node-v0.2.apk > pixel6a-tensor-ai-node-v0.2.apk.sha256
-          ls -lh pixel6a-tensor-ai-node-v0.*.apk*
 
-      - name: Update v0.1 Release & Publish v0.2 Bugfix Release
+      - name: Update v0.1 & v0.2 Releases with PNA CORS Support
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat << 'EOF' > release_notes.md
-          ### Pixel 6a TensorAI Node (Signed ARM64 APK — Fixed "Run on Phone" & Image Vision/Embeddings)
-          - **Bugfix #1 ("Run on Phone" Crash Fixed)**: Added `CoroutineExceptionHandler` crash guards, fixed MediaPipe `.tflite` disk loading (`MappedByteBuffer` via `setModelAssetBuffer` instead of `setModelAssetPath`), added dynamic ONNX `session.inputInfos` tensor allocation (`position_ids`, `token_type_ids`, `past_key_values`), and auto-routed Embedding models (`all-minilm-l6-v2-onnx`, `universal-sentence-encoder-litert`) so "RUN ON PHONE" never crashes.
-          - **Bugfix #2 ("+ IMAGE" Vision & Embedding Output)**: Added `VisionImageAnalyzer` with immediate image thumbnail preview, dominant color palette, lighting/edge analysis, and 384-D L2-normalized visual embedding extraction right when an image is picked and when "RUN ON PHONE" is tapped.
-          - **Voice Pipeline**: Unchanged and preserved intact.
-          EOF
           if gh release view v0.1 >/dev/null 2>&1; then
             gh release upload v0.1 pixel6a-tensor-ai-node-v0.1.apk pixel6a-tensor-ai-node-v0.1.apk.sha256 --clobber
-            gh release edit v0.1 --notes-file release_notes.md
           fi
           if gh release view v0.2 >/dev/null 2>&1; then
             gh release upload v0.2 pixel6a-tensor-ai-node-v0.2.apk pixel6a-tensor-ai-node-v0.2.apk.sha256 --clobber
-          else
-            gh release create v0.2 \
-              pixel6a-tensor-ai-node-v0.2.apk \
-              pixel6a-tensor-ai-node-v0.2.apk.sha256 \
-              --title "v0.2 — Fix Run on Phone Crash & Image Vision/Embeddings Output" \
-              --notes-file release_notes.md
           fi
