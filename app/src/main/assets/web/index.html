@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pixel 6a TensorAI Node v0.3 — Universal VPN &amp; Wi-Fi OpenAI Web Console</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #0b0f17;
+      color: #e6edf3;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .glass-card {
+      background: rgba(22, 27, 34, 0.88);
+      border: 1px solid rgba(48, 54, 61, 0.85);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1117;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #30363d;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-blue-600 selection:text-white">
+
+  <!-- Toast Notification Banner -->
+  <div id="toastBanner" class="fixed bottom-4 right-4 z-50 hidden max-w-sm rounded-xl bg-slate-800 border border-slate-600 px-4 py-3 text-sm text-slate-100 shadow-2xl transition-all">
+    <div class="flex items-center justify-between gap-3">
+      <span id="toastMessage">Notification</span>
+      <button id="closeToastBtn" type="button" class="text-slate-400 hover:text-white font-mono text-xs">✕</button>
+    </div>
+  </div>
+
+  <!-- Universal VPN & HTTPS Helper Modal -->
+  <div id="lanHelpModal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white">Universal Multi-User VPN &amp; Wi-Fi Architecture (v0.3)</h3>
+        <button id="closeLanHelpBtn" type="button" class="text-slate-400 hover:text-white text-sm font-mono">✕</button>
+      </div>
+      <div class="text-xs text-slate-300 space-y-3 leading-relaxed">
+        <p>
+          Because this GitHub Pages app (<code class="text-emerald-400 font-mono">https://blackx16.github.io</code>) runs 100% inside <strong>your own browser's OS networking stack</strong>, multiple people can open this exact URL at the same time while connected to their own independent VPNs (<strong>Tailscale</strong>, <strong>WireGuard</strong>, <strong>ZeroTier</strong>, or <strong>OpenVPN</strong>). Each user's requests route strictly through their own virtual <code class="text-blue-400 font-mono">tun0</code> tunnel to their own phone!
+        </p>
+        <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-1.5">
+          <div class="font-semibold text-emerald-400">Step 1 — Start Your VPN on Both Devices:</div>
+          <p>Turn on <strong>Tailscale</strong> (assigns a <code class="font-mono text-slate-200">100.x.y.z</code> CGNAT IP), <strong>WireGuard</strong> (<code class="font-mono text-slate-200">10.x.x.x</code>), <strong>ZeroTier</strong>, or <strong>OpenVPN</strong> on your Pixel 6a and on the laptop/phone viewing this page. In the Pixel 6a app (v0.3), Section 1 automatically detects your <code class="font-mono text-blue-300">tun0</code> VPN IP!</p>
+        </div>
+        <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-1.5">
+          <div class="font-semibold text-blue-400">Step 2 — Bypass Browser HTTPS-to-HTTP Mixed Content (Choose Any):</div>
+          <p><strong>A. Direct In-Tunnel Web UI (Zero Config):</strong> Click <strong>Open Direct on Phone IP</strong> to open this exact console served directly by your Pixel 6a over the encrypted VPN tunnel (<code id="modalDirectUrl" class="text-emerald-300 font-mono">http://100.64.0.1:8080/</code>).</p>
+          <p><strong>B. Allow Local/VPN HTTP on GitHub Pages:</strong> Click the <strong>Lock / Tune icon</strong> in your browser address bar → <strong>Site settings</strong> → set <strong>Insecure content</strong> &amp; <strong>Local network access</strong> to <strong>Allow</strong>.</p>
+          <p><strong>C. Tailscale HTTPS (<code class="font-mono">*.ts.net</code>):</strong> Enter your Tailscale HTTPS hostname (<code class="font-mono text-slate-200">https://pixel6a.tailnet.ts.net</code>) in the host box.</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="modalOpenDirectBtn" type="button" class="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white">Open Direct on Phone IP</button>
+        <button id="modalDismissBtn" type="button" class="rounded-lg bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-medium text-slate-200">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Header & Universal Multi-VPN Connection Bar -->
+  <header class="border-b border-slate-800/80 bg-[#0d1117]/95 sticky top-0 z-30 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 py-3 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center font-mono font-bold text-slate-950 text-sm shadow">
+            v0.3
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-sm sm:text-base font-bold tracking-tight text-white">Pixel 6a TensorAI Node</h1>
+              <span class="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono text-emerald-400">Universal Multi-VPN • v0.3</span>
+              <span class="hidden sm:inline-block rounded-full bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 text-[10px] font-mono text-blue-400">Android 17 • API 37</span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-mono">Tailscale (100.64/10) • WireGuard • ZeroTier • OpenVPN • Local Wi-Fi OpenAI Host</p>
+          </div>
+        </div>
+
+        <!-- Live Connection Status Pill -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div id="connectionBadge" class="flex items-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-mono text-amber-300">
+            <span id="statusDot" class="h-2 w-2 rounded-full bg-amber-400"></span>
+            <span id="statusText">Not Connected (Demo Fallback Active)</span>
+          </div>
+          <button id="copyVpnShareLinkBtn" type="button" class="rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 px-2.5 py-1 text-xs font-mono text-emerald-300 transition" title="Copy private #vpn=... pairing link for your tunnel">
+            Share My VPN Link 🔗
+          </button>
+          <button id="openLanHelpBtn" type="button" class="rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 text-xs font-mono text-slate-300 transition">
+            Wi-Fi / HTTPS Help
+          </button>
+        </div>
+      </div>
+
+      <!-- Universal VPN Protocol + Host + Bearer Key Controls -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
+        <div class="md:col-span-3 flex items-center gap-1.5">
+          <label for="vpnProtocolSelect" class="text-[11px] font-mono text-slate-400 shrink-0">Tunnel</label>
+          <select id="vpnProtocolSelect" class="w-full rounded-lg bg-slate-950 border border-slate-700/80 px-2 py-1.5 text-xs font-mono text-emerald-300 focus:border-blue-500 focus:outline-none">
+            <option value="tailscale">Tailscale VPN (100.x.y.z)</option>
+            <option value="wireguard">WireGuard (10.x.x.x / wg0)</option>
+            <option value="openvpn">OpenVPN / ZeroTier (tun0)</option>
+            <option value="ts_https">Tailscale HTTPS (*.ts.net)</option>
+            <option value="wifi">Local Wi-Fi (192.168.x.x)</option>
+          </select>
+        </div>
+
+        <div class="md:col-span-3 flex items-center gap-1.5">
+          <label for="wifiHostInput" class="text-[11px] font-mono text-slate-400 shrink-0">VPN/LAN IP</label>
+          <input
+            id="wifiHostInput"
+            type="text"
+            value="100.101.102.103:8080"
+            placeholder="100.x.y.z:8080 or 192.168.1.x:8080"
+            class="w-full rounded-lg bg-slate-950 border border-slate-700/80 px-2.5 py-1.5 text-xs font-mono text-white focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+
+        <div class="md:col-span-3 flex items-center gap-1.5">
+          <label for="apiKeyInput" class="text-[11px] font-mono text-slate-400 shrink-0">Key</label>
+          <input
+            id="apiKeyInput"
+            type="password"
+            value="sk-pixel6a-tensor"
+            placeholder="sk-pixel6a-tensor"
+            class="w-full rounded-lg bg-slate-950 border border-slate-700/80 px-2.5 py-1.5 text-xs font-mono text-white focus:border-blue-500 focus:outline-none"
+          />
+          <button id="toggleKeyVisBtn" type="button" class="rounded-lg bg-slate-800 hover:bg-slate-700 px-2 py-1.5 text-[11px] font-mono text-slate-300 shrink-0">
+            Show
+          </button>
+        </div>
+
+        <div class="md:col-span-3 flex flex-wrap items-center justify-end gap-1.5">
+          <button id="connectBtn" type="button" class="flex-1 sm:flex-none rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition shadow">
+            Connect to Pixel 6a
+          </button>
+          <button id="openDirectHttpBtn" type="button" class="rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 px-2.5 py-1.5 text-xs font-mono text-blue-300 transition" title="Open Web Console directly inside your VPN/LAN HTTP tunnel">
+            Direct HTTP ↗
+          </button>
+          <label class="flex items-center gap-1 text-[11px] font-mono text-slate-400 cursor-pointer">
+            <input id="demoFallbackToggle" type="checkbox" checked class="rounded border-slate-700 bg-slate-950 text-blue-500" />
+            <span>Sim</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Multi-User Isolated VPN Profile Switcher & Telemetry Strip -->
+      <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-400 px-1">
+        <div class="flex flex-wrap items-center gap-2">
+          <span>Saved VPN Profiles (Browser-Isolated):</span>
+          <select id="vpnProfileSelect" class="rounded bg-slate-900 border border-slate-700 px-2 py-0.5 text-[11px] font-mono text-slate-200">
+            <option value="default">Default Profile</option>
+          </select>
+          <button id="saveProfileBtn" type="button" class="rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 text-[10px] text-blue-300">
+            + Save Current VPN Profile
+          </button>
+        </div>
+        <div id="telemetryHardware" class="hidden xl:block">SoC: Tensor GS101 (0xF0)</div>
+        <div id="telemetryMemory">AnonRSS: -- MB | mmap: -- MB | Active Tunnel: <span id="activeBaseUrlLabel" class="text-emerald-400">http://100.101.102.103:8080/v1</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace Container -->
+  <main class="max-w-7xl w-full mx-auto px-4 py-4 flex-1 flex flex-col gap-4">
+
+    <!-- Navigation Tabs -->
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+      <div class="flex flex-wrap gap-1.5">
+        <button id="tabChatBtn" type="button" class="rounded-lg bg-blue-600 text-white px-3.5 py-1.5 text-xs font-semibold transition">
+          1. Chat &amp; Vision (/v1/chat/completions)
+        </button>
+        <button id="tabEmbedBtn" type="button" class="rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-800 px-3.5 py-1.5 text-xs font-semibold transition">
+          2. Embeddings &amp; Cosine (/v1/embeddings)
+        </button>
+        <button id="tabVoiceBtn" type="button" class="rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-800 px-3.5 py-1.5 text-xs font-semibold transition">
+          3. Voice ASR &amp; TTS (/v1/audio/*)
+        </button>
+        <button id="tabApiBtn" type="button" class="rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-800 px-3.5 py-1.5 text-xs font-semibold transition">
+          4. SDK &amp; cURL Snippets
+        </button>
+      </div>
+
+      <!-- Active Model Selector -->
+      <div class="flex items-center gap-2">
+        <label for="modelSelect" class="text-xs font-mono text-slate-400">Model:</label>
+        <select id="modelSelect" class="rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-xs font-mono text-white focus:border-blue-500 focus:outline-none">
+          <option value="gemma-4-e2b-it-litert">gemma-4-e2b-it-litert (LiteRT GPU Multimodal)</option>
+          <option value="qwen2.5-1.5b-instruct-onnx">qwen2.5-1.5b-instruct-onnx (ONNX INT4 XNNPACK)</option>
+          <option value="gemma-3-1b-it-litert">gemma-3-1b-it-litert (LiteRT Fast Text)</option>
+          <option value="all-minilm-l6-v2-onnx">all-minilm-l6-v2-onnx (ONNX 384-D Embeddings)</option>
+          <option value="universal-sentence-encoder-litert">universal-sentence-encoder-litert (LiteRT 100-D)</option>
+          <option value="whisper-tiny-int8-onnx">whisper-tiny-int8-onnx (ONNX Voice ASR)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- TAB 1: CHAT & VISION PLAYGROUND -->
+    <section id="panelChat" class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+      <div class="lg:col-span-8 glass-card rounded-2xl p-4 flex flex-col justify-between min-h-[460px]">
+        <div id="chatMessagesBox" class="space-y-3 overflow-y-auto max-h-[380px] pr-1">
+          <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 text-xs leading-relaxed text-slate-300">
+            <div class="font-mono text-[11px] text-emerald-400 mb-1">UNIVERSAL MULTI-USER VPN &amp; LAN ROUTER • v0.3</div>
+            Connect your phone and this browser to your own <strong>Tailscale</strong> (<code class="font-mono text-blue-300">100.x.y.z:8080</code>), <strong>WireGuard</strong> (<code class="font-mono text-blue-300">10.x.x.x:8080</code>), <strong>ZeroTier</strong>, or <strong>OpenVPN</strong> tunnel (or Local Wi-Fi), enter your phone's IP above, and click <strong>Connect to Pixel 6a</strong>. Every visitor's browser routes exclusively through their own local VPN interface—so multiple people can use this GitHub Pages web app at the same time on their own VPNs!
+          </div>
+        </div>
+
+        <div id="chatImagePreviewWrap" class="hidden mt-3 rounded-xl bg-slate-900 border border-slate-700 p-2.5 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <img id="chatImageThumb" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Attached preview" class="h-12 w-12 object-cover rounded-lg border border-slate-600" />
+            <div class="text-xs font-mono">
+              <div id="chatImageMeta" class="text-emerald-400 font-semibold">Image attached</div>
+              <div id="chatImageEmbedSnippet" class="text-[11px] text-slate-400">384-D Visual Embedding extracted</div>
+            </div>
+          </div>
+          <button id="removeChatImageBtn" type="button" class="rounded-lg bg-rose-600/20 border border-rose-500/40 px-2.5 py-1 text-xs font-mono text-rose-300 hover:bg-rose-600/30">
+            Clear Image
+          </button>
+        </div>
+
+        <div class="mt-3 pt-3 border-t border-slate-800 space-y-2">
+          <textarea
+            id="chatPromptInput"
+            rows="2"
+            placeholder="Ask Gemma 4 E2B (LiteRT) or Qwen2.5 (ONNX) anything over your VPN tunnel, or attach an image..."
+            class="w-full rounded-xl bg-slate-950 border border-slate-700/80 p-3 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none resize-none"
+          >Explain how Tailscale CGNAT (100.64.0.0/10) and Tensor GS101 big-core pinning work together in v0.3.</textarea>
+
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <label for="chatImageFileInput" class="cursor-pointer rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 text-xs font-mono text-slate-200 transition">
+                + Attach Image
+              </label>
+              <input id="chatImageFileInput" type="file" accept="image/*" class="hidden" />
+
+              <button id="clearChatBtn" type="button" class="rounded-lg bg-slate-800/70 hover:bg-slate-800 px-3 py-1.5 text-xs font-mono text-slate-400 transition">
+                Clear Chat
+              </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <span id="chatMetricsLabel" class="text-[11px] font-mono text-slate-400">Ready</span>
+              <button id="sendChatBtn" type="button" class="rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white shadow transition">
+                Send to Pixel 6a →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-4 space-y-4">
+        <div class="glass-card rounded-2xl p-4 space-y-3">
+          <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Inference Parameters</h2>
+
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-300">SSE Token Streaming (<code class="font-mono text-blue-300">stream: true</code>)</span>
+            <input id="streamToggle" type="checkbox" checked class="rounded border-slate-700 bg-slate-950 text-blue-500" />
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs font-mono">
+              <span class="text-slate-400">Temperature</span>
+              <span id="tempValLabel" class="text-white">0.70</span>
+            </div>
+            <input id="tempSlider" type="range" min="0" max="1.5" step="0.05" value="0.7" class="w-full accent-blue-500" />
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs font-mono">
+              <span class="text-slate-400">Max Tokens</span>
+              <span id="maxTokensValLabel" class="text-white">512</span>
+            </div>
+            <input id="maxTokensSlider" type="range" min="64" max="2048" step="64" value="512" class="w-full accent-blue-500" />
+          </div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 space-y-2">
+          <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">Image Vision &amp; 384-D Embedding Output</h2>
+          <pre id="visionInspectorOutput" class="text-[11px] font-mono text-slate-300 whitespace-pre-wrap bg-slate-950/90 border border-slate-800 rounded-xl p-3 max-h-56 overflow-y-auto">Attach any image using "+ Attach Image" to inspect its resolution, dominant RGB palette, lighting/edge density, and 384-D L2-normalized visual embedding vector.</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: EMBEDDINGS & COSINE SIMILARITY PLAYGROUND -->
+    <section id="panelEmbed" class="hidden grid-cols-1 lg:grid-cols-12 gap-4">
+      <div class="lg:col-span-5 glass-card rounded-2xl p-4 space-y-3">
+        <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Embeddings Input (/v1/embeddings)</h2>
+        <p class="text-xs text-slate-400">Enter 2 or more lines of text to compute L2-normalized semantic embeddings on your Pixel 6a (<code class="text-slate-200 font-mono">all-minilm-l6-v2-onnx</code> or <code class="text-slate-200 font-mono">universal-sentence-encoder-litert</code>) over your VPN tunnel and compare their pairwise cosine similarity.</p>
+        <textarea
+          id="embedLinesInput"
+          rows="5"
+          class="w-full rounded-xl bg-slate-950 border border-slate-700/80 p-3 text-xs font-mono text-white focus:border-blue-500 focus:outline-none"
+        >Google Pixel 6a Tensor GS101 on-device AI server over Tailscale VPN
+Running quantized LiteRT and ONNX neural networks on mobile
+Baking sourdough bread in a cast iron Dutch oven</textarea>
+        <button id="runEmbedBtn" type="button" class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-semibold text-white shadow transition">
+          Compute Embeddings &amp; Cosine Matrix
+        </button>
+      </div>
+
+      <div class="lg:col-span-7 glass-card rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">Vector &amp; Cosine Similarity Output</h2>
+          <span id="embedMetaLabel" class="text-[11px] font-mono text-slate-400">384-D L2-Normalized</span>
+        </div>
+        <div id="embedMatrixContainer" class="text-xs font-mono text-slate-300 space-y-3 bg-slate-950/90 border border-slate-800 rounded-xl p-3 min-h-[220px] overflow-x-auto">
+          Click "Compute Embeddings &amp; Cosine Matrix" to view the vector dimensions and similarity table.
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: VOICE STUDIO (ASR & TTS) -->
+    <section id="panelVoice" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="glass-card rounded-2xl p-4 space-y-3">
+        <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Speech-to-Text (/v1/audio/transcriptions)</h2>
+        <p class="text-xs text-slate-400">Record from your microphone or upload a WAV/audio clip to transcribe via <strong>Whisper Tiny INT8 ONNX</strong> on the Pixel 6a over VPN/LAN.</p>
+        <div class="flex flex-wrap items-center gap-2 pt-1">
+          <button id="recordAudioBtn" type="button" class="rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-semibold text-white transition">
+            ● Record Mic (3s Clip)
+          </button>
+          <label for="audioFileUpload" class="cursor-pointer rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 text-xs font-mono text-slate-200 transition">
+            Upload WAV / Audio
+          </label>
+          <input id="audioFileUpload" type="file" accept="audio/*" class="hidden" />
+        </div>
+        <pre id="asrOutputBox" class="text-xs font-mono text-slate-300 bg-slate-950 border border-slate-800 rounded-xl p-3 min-h-[120px] whitespace-pre-wrap">Transcript output will appear here...</pre>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 space-y-3">
+        <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">Text-to-Speech (/v1/audio/speech)</h2>
+        <p class="text-xs text-slate-400">Synthesize 16 kHz Mono RIFF WAV speech on the Pixel 6a's hardware speech engine and play it back in your browser.</p>
+        <textarea
+          id="ttsInputText"
+          rows="3"
+          class="w-full rounded-xl bg-slate-950 border border-slate-700/80 p-3 text-xs text-white focus:border-blue-500 focus:outline-none"
+        >Hello from the Google Pixel 6a Tensor GS101 local AI server over our encrypted VPN mesh.</textarea>
+        <div class="flex items-center justify-between gap-3">
+          <button id="runTtsBtn" type="button" class="rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition">
+            Synthesize &amp; Play WAV
+          </button>
+          <audio id="ttsAudioPlayer" controls class="h-9 max-w-[240px]"></audio>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: OPENAI SDK & CURL SNIPPETS -->
+    <section id="panelApi" class="hidden grid-cols-1 gap-4">
+      <div class="glass-card rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Ready-to-Use OpenAI Client Code (Pre-Filled with Your VPN/Wi-Fi IP &amp; Key)</h2>
+          <button id="copySnippetBtn" type="button" class="rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-1 text-xs font-mono text-white">
+            Copy Code
+          </button>
+        </div>
+        <pre id="codeSnippetsBox" class="text-xs font-mono text-slate-200 bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-x-auto leading-relaxed"></pre>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const state = {
+      host: '100.101.102.103:8080',
+      apiKey: 'sk-pixel6a-tensor',
+      protocol: 'tailscale',
+      isConnected: false,
+      attachedImageDataUrl: null,
+      attachedImageReport: null,
+      profiles: []
+    };
+
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      const label = document.getElementById('toastMessage');
+      label.textContent = msg;
+      banner.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 4000);
+    }
+
+    function copyTextSafe(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!')).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('Copied to clipboard!');
+      } catch (e) {
+        showToast('Copy failed');
+      }
+      document.body.removeChild(ta);
+    }
+
+    function getCleanBaseHost() {
+      const raw = document.getElementById('wifiHostInput').value.trim()
+        .replace(/\/v1\/?$/i, '')
+        .replace(/\/+$/, '');
+      return raw || '100.101.102.103:8080';
+    }
+
+    function getBaseUrl() {
+      const raw = getCleanBaseHost();
+      const proto = document.getElementById('vpnProtocolSelect').value;
+      if (/^https?:\/\//i.test(raw)) {
+        return raw;
+      }
+      if (proto === 'ts_https' || raw.endsWith('.ts.net')) {
+        return 'https://' + raw;
+      }
+      return 'http://' + raw;
+    }
+
+    function parseUrlParamsAndHash() {
+      const hashStr = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+      const hashParams = new URLSearchParams(hashStr);
+      const searchParams = new URLSearchParams(window.location.search);
+
+      return {
+        vpn: hashParams.get('vpn') || hashParams.get('host') || searchParams.get('vpn') || searchParams.get('host'),
+        key: hashParams.get('key') || searchParams.get('key'),
+        proto: hashParams.get('proto') || searchParams.get('proto')
+      };
+    }
+
+    function saveSettingsToStorage() {
+      try {
+        localStorage.setItem('pixel6a_wifi_host', getCleanBaseHost());
+        localStorage.setItem('pixel6a_api_key', document.getElementById('apiKeyInput').value.trim());
+        localStorage.setItem('pixel6a_vpn_proto', document.getElementById('vpnProtocolSelect').value);
+      } catch (e) {}
+    }
+
+    function loadProfilesFromStorage() {
+      try {
+        const raw = localStorage.getItem('pixel6a_vpn_profiles');
+        state.profiles = raw ? JSON.parse(raw) : [
+          { name: 'Tailscale Mesh (100.x.y.z)', host: '100.101.102.103:8080', proto: 'tailscale', key: 'sk-pixel6a-tensor' },
+          { name: 'WireGuard Tunnel (10.0.0.2)', host: '10.0.0.2:8080', proto: 'wireguard', key: 'sk-pixel6a-tensor' },
+          { name: 'OpenVPN Tunnel (10.8.0.2)', host: '10.8.0.2:8080', proto: 'openvpn', key: 'sk-pixel6a-tensor' },
+          { name: 'Local Wi-Fi (192.168.1.42)', host: '192.168.1.42:8080', proto: 'wifi', key: 'sk-pixel6a-tensor' }
+        ];
+      } catch (e) {
+        state.profiles = [];
+      }
+      renderProfileSelector();
+    }
+
+    function renderProfileSelector() {
+      const sel = document.getElementById('vpnProfileSelect');
+      sel.innerHTML = '';
+      state.profiles.forEach((p, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = `${p.name} [${p.host}]`;
+        sel.appendChild(opt);
+      });
+    }
+
+    function saveCurrentProfile() {
+      const host = getCleanBaseHost();
+      const proto = document.getElementById('vpnProtocolSelect').value;
+      const key = document.getElementById('apiKeyInput').value.trim() || 'sk-pixel6a-tensor';
+      const label = `${proto.toUpperCase()} (${host})`;
+      state.profiles.unshift({ name: label, host: host, proto: proto, key: key });
+      if (state.profiles.length > 10) state.profiles.pop();
+      try {
+        localStorage.setItem('pixel6a_vpn_profiles', JSON.stringify(state.profiles));
+      } catch (e) {}
+      renderProfileSelector();
+      showToast('Saved VPN profile "' + label + '" to this browser!');
+    }
+
+    function loadSettingsFromStorage() {
+      loadProfilesFromStorage();
+      try {
+        const incoming = parseUrlParamsAndHash();
+        if (incoming.proto) {
+          document.getElementById('vpnProtocolSelect').value = incoming.proto;
+        } else {
+          const savedProto = localStorage.getItem('pixel6a_vpn_proto');
+          if (savedProto) document.getElementById('vpnProtocolSelect').value = savedProto;
+        }
+
+        if (incoming.vpn) {
+          document.getElementById('wifiHostInput').value = incoming.vpn;
+        } else if (window.location.protocol === 'http:' && window.location.host && !window.location.host.includes('github.io')) {
+          document.getElementById('wifiHostInput').value = window.location.host;
+        } else {
+          const savedHost = localStorage.getItem('pixel6a_wifi_host');
+          if (savedHost) document.getElementById('wifiHostInput').value = savedHost;
+        }
+
+        if (incoming.key) {
+          document.getElementById('apiKeyInput').value = incoming.key;
+        } else {
+          const savedKey = localStorage.getItem('pixel6a_api_key');
+          if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+        }
+      } catch (e) {}
+      document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
+      updateSnippets();
+    }
+
+    function copyPrivateVpnShareLink() {
+      const host = encodeURIComponent(getCleanBaseHost());
+      const key = encodeURIComponent(document.getElementById('apiKeyInput').value.trim() || 'sk-pixel6a-tensor');
+      const proto = encodeURIComponent(document.getElementById('vpnProtocolSelect').value);
+      const basePage = 'https://blackx16.github.io/pixel6a-tensor-ai-node/';
+      const shareUrl = `${basePage}#vpn=${host}&key=${key}&proto=${proto}`;
+      copyTextSafe(shareUrl);
+    }
+
+    function updateConnectionUi(connected, detailText) {
+      state.isConnected = connected;
+      const badge = document.getElementById('connectionBadge');
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
+      document.getElementById('modalDirectUrl').textContent = getBaseUrl() + '/';
+
+      if (connected) {
+        badge.className = 'flex items-center gap-2 rounded-full bg-emerald-500/15 border border-emerald-500/40 px-3 py-1 text-xs font-mono text-emerald-300';
+        dot.className = 'h-2 w-2 rounded-full bg-emerald-400 animate-pulse';
+        text.textContent = detailText || ('VPN/LAN Connected: ' + getCleanBaseHost());
+      } else {
+        badge.className = 'flex items-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-mono text-amber-300';
+        dot.className = 'h-2 w-2 rounded-full bg-amber-400';
+        text.textContent = detailText || 'Offline / Sim Fallback Ready';
+      }
+      updateSnippets();
+    }
+
+    async function connectToPixelServer() {
+      saveSettingsToStorage();
+      const baseUrl = getBaseUrl();
+      const key = document.getElementById('apiKeyInput').value.trim();
+      updateConnectionUi(false, 'Dialing VPN/LAN ' + baseUrl + '...');
+
+      try {
+        const healthResp = await fetch(baseUrl + '/health', {
+          method: 'GET',
+          mode: 'cors'
+        });
+        if (!healthResp.ok) throw new Error('HTTP ' + healthResp.status);
+        const health = await healthResp.json();
+
+        document.getElementById('telemetryHardware').textContent =
+          'Device: ' + (health.device || 'Pixel 6a') + ' • ' + (health.vpn_status || 'VPN/LAN Ready');
+        document.getElementById('telemetryMemory').innerHTML =
+          'AnonRSS: <strong>' + (health.rss_anon_mb ?? 0) + ' MB</strong> | mmap: <strong>' +
+          (health.rss_file_mmap_mb ?? 0) + ' MB</strong> | Tunnel: <span id="activeBaseUrlLabel" class="text-emerald-400">' + baseUrl + '/v1</span>';
+
+        const modelsResp = await fetch(baseUrl + '/v1/models', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + key }
+        });
+        if (modelsResp.status === 401) {
+          updateConnectionUi(false, 'Auth Failed (401: Check Bearer Key)');
+          showToast('Bearer API Key rejected by Pixel 6a (HTTP 401)');
+          return;
+        }
+        if (modelsResp.ok) {
+          const modelsData = await modelsResp.json();
+          if (Array.isArray(modelsData.data) && modelsData.data.length > 0) {
+            const sel = document.getElementById('modelSelect');
+            const prev = sel.value;
+            sel.innerHTML = '';
+            modelsData.data.forEach(m => {
+              const opt = document.createElement('option');
+              opt.value = m.id;
+              opt.textContent = m.id + (m.installed ? ' [INSTALLED]' : ' [Web Download Ready]');
+              sel.appendChild(opt);
+            });
+            if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+          }
+        }
+
+        updateConnectionUi(true, 'LIVE OVER VPN/LAN (' + getCleanBaseHost() + ')');
+        showToast('Connected to Pixel 6a over ' + document.getElementById('vpnProtocolSelect').value.toUpperCase() + '!');
+      } catch (err) {
+        const isHttpsPage = window.location.protocol === 'https:' && baseUrl.startsWith('http://');
+        const hint = isHttpsPage
+          ? 'HTTPS->HTTP blocked or VPN unreachable. Click "Direct HTTP ↗" or "Wi-Fi / HTTPS Help".'
+          : 'Unreachable (' + err.message + '). Sim Fallback active.';
+        updateConnectionUi(false, hint);
+        showToast(hint);
+      }
+    }
+
+    function analyzeImageOnClient(file) {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const dataUrl = evt.target.result;
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const size = 64;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, size, size);
+          const imgData = ctx.getImageData(0, 0, size, size).data;
+
+          const vec = new Float32Array(384);
+          let lumSum = 0;
+          let edgeCount = 0;
+          for (let y = 0; y < size; y++) {
+            const gy = Math.min(3, Math.floor((y * 4) / size));
+            for (let x = 0; x < size; x++) {
+              const gx = Math.min(3, Math.floor((x * 4) / size));
+              const cell = gy * 4 + gx;
+              const idx = (y * size + x) * 4;
+              const r = imgData[idx], g = imgData[idx + 1], b = imgData[idx + 2];
+              const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+              lumSum += lum;
+
+              let grad = 0;
+              if (x + 1 < size) {
+                const nIdx = (y * size + (x + 1)) * 4;
+                grad = (Math.abs(r - imgData[nIdx]) + Math.abs(g - imgData[nIdx + 1]) + Math.abs(b - imgData[nIdx + 2])) / 765;
+                if (grad > 0.15) edgeCount++;
+              }
+              const base = cell * 24;
+              vec[base + Math.min(7, Math.floor(r / 32))] += 1;
+              vec[base + 8 + Math.min(7, Math.floor(g / 32))] += 1;
+              vec[base + 16 + Math.min(7, Math.floor(b / 32))] += (0.5 + grad);
+            }
+          }
+
+          let normSq = 0;
+          for (let i = 0; i < 384; i++) normSq += vec[i] * vec[i];
+          const norm = Math.sqrt(normSq) || 1;
+          for (let i = 0; i < 384; i++) vec[i] = vec[i] / norm;
+
+          const totalPx = size * size;
+          const brightPct = Math.round((lumSum / totalPx) * 100);
+          const edgePct = Math.round((edgeCount / totalPx) * 100);
+          const previewNums = Array.from(vec.slice(0, 8)).map(v => v.toFixed(4)).join(', ');
+
+          const report = {
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            brightnessPct: brightPct,
+            edgePct: edgePct,
+            embedding: Array.from(vec),
+            summary: `Resolution: ${img.naturalWidth}x${img.naturalHeight} px | Brightness: ${brightPct}% | Edge Density: ${edgePct}%\nVisual Embedding (384-D L2-Normalized):\n[${previewNums}, ...]`
+          };
+
+          state.attachedImageDataUrl = dataUrl;
+          state.attachedImageReport = report;
+
+          document.getElementById('chatImageThumb').src = dataUrl;
+          document.getElementById('chatImageMeta').textContent = `${file.name} (${img.naturalWidth}x${img.naturalHeight} px)`;
+          document.getElementById('chatImageEmbedSnippet').textContent = `384-D Vector[0..3]: [${Array.from(vec.slice(0, 4)).map(v => v.toFixed(3)).join(', ')}...]`;
+          document.getElementById('chatImagePreviewWrap').classList.remove('hidden');
+          document.getElementById('visionInspectorOutput').textContent = report.summary;
+          showToast('Image analyzed & 384-D Visual Embedding ready!');
+        };
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function appendChatBubble(role, text, metaText) {
+      const box = document.getElementById('chatMessagesBox');
+      const wrap = document.createElement('div');
+      const isUser = role === 'user';
+      wrap.className = isUser
+        ? 'rounded-xl bg-blue-600/20 border border-blue-500/30 p-3 text-xs text-slate-100 ml-6'
+        : 'rounded-xl bg-slate-900/95 border border-slate-800 p-3 text-xs text-slate-200 mr-6';
+
+      const header = document.createElement('div');
+      header.className = 'font-mono text-[10px] mb-1 ' + (isUser ? 'text-blue-300' : 'text-emerald-400');
+      header.textContent = isUser ? 'YOU' : ('PIXEL 6A (' + getCleanBaseHost() + ') • ' + document.getElementById('modelSelect').value.toUpperCase());
+
+      const body = document.createElement('div');
+      body.className = 'whitespace-pre-wrap leading-relaxed font-sans';
+      body.textContent = text;
+
+      wrap.appendChild(header);
+      wrap.appendChild(body);
+
+      if (metaText) {
+        const footer = document.createElement('div');
+        footer.className = 'mt-2 pt-1 border-t border-slate-800/80 font-mono text-[10px] text-slate-400';
+        footer.textContent = metaText;
+        wrap.appendChild(footer);
+      }
+
+      box.appendChild(wrap);
+      box.scrollTop = box.scrollHeight;
+      return { body, wrap };
+    }
+
+    async function sendChatCompletion() {
+      const promptEl = document.getElementById('chatPromptInput');
+      const prompt = promptEl.value.trim();
+      if (!prompt && !state.attachedImageDataUrl) {
+        showToast('Enter a prompt or attach an image first.');
+        return;
+      }
+
+      const model = document.getElementById('modelSelect').value;
+      const stream = document.getElementById('streamToggle').checked;
+      const temperature = parseFloat(document.getElementById('tempSlider').value);
+      const maxTokens = parseInt(document.getElementById('maxTokensSlider').value, 10);
+
+      const userDisplay = state.attachedImageReport
+        ? `[Attached Image: ${state.attachedImageReport.width}x${state.attachedImageReport.height} px]\n${prompt}`
+        : prompt;
+      appendChatBubble('user', userDisplay);
+
+      const contentPayload = state.attachedImageDataUrl
+        ? [
+            { type: 'text', text: prompt || 'Analyze this image and show its visual embedding summary.' },
+            { type: 'image_url', image_url: { url: state.attachedImageDataUrl } }
+          ]
+        : prompt;
+
+      const requestBody = {
+        model: model,
+        messages: [{ role: 'user', content: contentPayload }],
+        temperature: temperature,
+        max_tokens: maxTokens,
+        stream: stream
+      };
+
+      const assistantBubble = appendChatBubble('assistant', 'Routing over VPN/LAN tunnel to Pixel 6a...');
+      const startMs = performance.now();
+      document.getElementById('chatMetricsLabel').textContent = 'Streaming over tunnel...';
+
+      try {
+        const resp = await fetch(getBaseUrl() + '/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + document.getElementById('apiKeyInput').value.trim()
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status);
+        }
+
+        if (stream && resp.body) {
+          assistantBubble.body.textContent = '';
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let chunks = 0;
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data:')) continue;
+              const dataStr = trimmed.slice(5).trim();
+              if (dataStr === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(dataStr);
+                const delta = parsed.choices?.[0]?.delta?.content || '';
+                if (delta) {
+                  chunks++;
+                  assistantBubble.body.textContent += delta;
+                }
+              } catch (e) {}
+            }
+          }
+          const elapsedSec = ((performance.now() - startMs) / 1000).toFixed(2);
+          document.getElementById('chatMetricsLabel').textContent = `${chunks} chunks in ${elapsedSec}s`;
+        } else {
+          const data = await resp.json();
+          const text = data.choices?.[0]?.message?.content || JSON.stringify(data);
+          assistantBubble.body.textContent = text;
+          const elapsedSec = ((performance.now() - startMs) / 1000).toFixed(2);
+          document.getElementById('chatMetricsLabel').textContent = `Completed in ${elapsedSec}s`;
+        }
+        updateConnectionUi(true, 'LIVE OVER VPN/LAN (' + getCleanBaseHost() + ')');
+      } catch (err) {
+        if (document.getElementById('demoFallbackToggle').checked) {
+          const protoName = document.getElementById('vpnProtocolSelect').value.toUpperCase();
+          const simText = state.attachedImageReport
+            ? `=== On-Device Vision & 384-D Image Embedding Output (${model} via ${protoName}) ===\n${state.attachedImageReport.summary}\n\nPrompt Analysis ("${prompt}"):\nProcessed ${state.attachedImageReport.width}x${state.attachedImageReport.height} image frame on Google Tensor GS101 (Mali-G78 MP20 + 0xF0 Big Cores).`
+            : `[Simulated Pixel 6a VPN Node • ${model} via ${protoName} (${getCleanBaseHost()})]\nTo query your live phone over ${protoName}, ensure your VPN is connected on both devices and "START SERVER" is active in the Pixel 6a v0.3 app (or click "Direct HTTP ↗" to open the console directly inside your VPN tunnel).\n\nAnswer for "${prompt}":\nIn v0.3, the Pixel 6a scans Android's ConnectivityManager (TRANSPORT_VPN) and NetworkInterface (tun0, wg0, tailscale0, zt*) for RFC 6598 CGNAT (100.64.0.0/10) and RFC 1918 tunnel IPs while binding ServerSocket to 0.0.0.0:8080—allowing every user on blackx16.github.io to route through their own private VPN simultaneously.`;
+          assistantBubble.body.textContent = simText;
+          document.getElementById('chatMetricsLabel').textContent = 'Simulated Fallback (46.2 tok/s)';
+        } else {
+          assistantBubble.body.textContent = 'Request failed: ' + err.message + '. Enable "Sim" fallback or click "Direct HTTP ↗".';
+          document.getElementById('chatMetricsLabel').textContent = 'Connection error';
+        }
+      }
+    }
+
+    function computeLocalEmbedding384(text) {
+      const vec = new Float32Array(384);
+      const clean = (text || '').trim().toLowerCase();
+      for (let i = 0; i < clean.length; i++) {
+        const code = clean.charCodeAt(i);
+        const bucket = (code * 31 + i * 17) % 384;
+        vec[bucket] += 1.0;
+      }
+      let sumSq = 0;
+      for (let i = 0; i < 384; i++) sumSq += vec[i] * vec[i];
+      const norm = Math.sqrt(sumSq) || 1;
+      for (let i = 0; i < 384; i++) vec[i] /= norm;
+      return Array.from(vec);
+    }
+
+    function cosineSim(a, b) {
+      const n = Math.min(a.length, b.length);
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < n; i++) {
+        dot += a[i] * b[i];
+        na += a[i] * a[i];
+        nb += b[i] * b[i];
+      }
+      return dot / (Math.sqrt(na * nb) || 1);
+    }
+
+    async function runEmbeddingsPlayground() {
+      const rawLines = document.getElementById('embedLinesInput').value
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (rawLines.length === 0) {
+        showToast('Enter at least one line of text.');
+        return;
+      }
+
+      const container = document.getElementById('embedMatrixContainer');
+      container.textContent = 'Computing embeddings on Pixel 6a over tunnel...';
+      let vectors = [];
+      let modelUsed = 'all-minilm-l6-v2-onnx';
+
+      try {
+        const resp = await fetch(getBaseUrl() + '/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + document.getElementById('apiKeyInput').value.trim()
+          },
+          body: JSON.stringify({
+            model: modelUsed,
+            input: rawLines
+          })
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const json = await resp.json();
+        vectors = json.data.map(d => d.embedding);
+        modelUsed = json.model || modelUsed;
+      } catch (e) {
+        vectors = rawLines.map(line => computeLocalEmbedding384(line));
+        modelUsed = 'all-minilm-l6-v2-onnx (Local Preview)';
+      }
+
+      document.getElementById('embedMetaLabel').textContent = `${modelUsed} • ${vectors[0].length}-D`;
+
+      let html = '<div class="space-y-2">';
+      rawLines.forEach((line, idx) => {
+        const preview = vectors[idx].slice(0, 6).map(v => Number(v).toFixed(4)).join(', ');
+        html += `<div class="rounded-lg bg-slate-900 border border-slate-800 p-2">
+          <div class="text-blue-400 font-semibold">#${idx + 1}: "${line}"</div>
+          <div class="text-[11px] text-slate-400">Vector[0..5]: [${preview}, ...]</div>
+        </div>`;
+      });
+      html += '</div>';
+
+      html += '<div class="pt-2"><div class="text-emerald-400 font-semibold mb-1">Pairwise Cosine Similarity Matrix:</div>';
+      html += '<table class="w-full text-left border-collapse text-[11px]"><thead><tr class="border-b border-slate-800 text-slate-400"><th class="p-1.5">Input</th>';
+      rawLines.forEach((_, idx) => {
+        html += `<th class="p-1.5 text-right">#${idx + 1}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+      rawLines.forEach((rowText, r) => {
+        html += `<tr class="border-b border-slate-900"><td class="p-1.5 truncate max-w-[180px]">#${r + 1} ${rowText}</td>`;
+        rawLines.forEach((_, c) => {
+          const sim = cosineSim(vectors[r], vectors[c]);
+          const color = sim > 0.75 ? 'text-emerald-400 font-bold' : (sim > 0.35 ? 'text-blue-300' : 'text-slate-400');
+          html += `<td class="p-1.5 text-right ${color}">${sim.toFixed(4)}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
+
+    function generateClientSideWav(text) {
+      const sampleRate = 16000;
+      const numSamples = sampleRate;
+      const buffer = new ArrayBuffer(44 + numSamples * 2);
+      const view = new DataView(buffer);
+      const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + numSamples * 2, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, 'data');
+      view.setUint32(40, numSamples * 2, true);
+
+      for (let i = 0; i < numSamples; i++) {
+        const ch = text.charCodeAt(i % Math.max(1, text.length)) || 65;
+        const freq = 240 + (ch % 20) * 15;
+        const env = Math.sin((Math.PI * i) / numSamples);
+        const sample = Math.sin((2 * Math.PI * freq * i) / sampleRate) * env * 7000;
+        view.setInt16(44 + i * 2, sample, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    async function synthesizeTtsSpeech() {
+      const text = document.getElementById('ttsInputText').value.trim() || 'Hello from Pixel 6a';
+      const player = document.getElementById('ttsAudioPlayer');
+      try {
+        const resp = await fetch(getBaseUrl() + '/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + document.getElementById('apiKeyInput').value.trim()
+          },
+          body: JSON.stringify({ model: 'pixel-tensor-tts', input: text, speed: 1.0 })
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        player.src = URL.createObjectURL(blob);
+        player.play().catch(() => {});
+        showToast('Playing synthesized WAV from Pixel 6a!');
+      } catch (e) {
+        const fallbackBlob = generateClientSideWav(text);
+        player.src = URL.createObjectURL(fallbackBlob);
+        player.play().catch(() => {});
+        showToast('Played local fallback WAV preview (Pixel 6a offline)');
+      }
+    }
+
+    async function transcribeAudioBlob(blob, labelName) {
+      const out = document.getElementById('asrOutputBox');
+      out.textContent = `Sending ${labelName} (${Math.round(blob.size / 1024)} KB) to Pixel 6a /v1/audio/transcriptions...`;
+      try {
+        const form = new FormData();
+        form.append('file', blob, labelName);
+        form.append('model', 'whisper-tiny-int8-onnx');
+        const resp = await fetch(getBaseUrl() + '/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + document.getElementById('apiKeyInput').value.trim()
+          },
+          body: form
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const json = await resp.json();
+        out.textContent = `Model: ${json.model}\nDuration: ${json.duration_ms} ms\n\nTranscript:\n${json.text}`;
+      } catch (e) {
+        out.textContent = `[Simulated Whisper Tiny INT8 ONNX Transcript for ${labelName}]\n"Testing local voice transcription on Google Pixel 6a Tensor GS101 over VPN."`;
+      }
+    }
+
+    function updateSnippets() {
+      const baseUrl = getBaseUrl() + '/v1';
+      const key = document.getElementById('apiKeyInput').value.trim() || 'sk-pixel6a-tensor';
+      const model = document.getElementById('modelSelect').value || 'gemma-4-e2b-it-litert';
+
+      const snippet = `# 1. cURL (Streaming Chat Completion over Tailscale / WireGuard / OpenVPN / Wi-Fi)
+curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer ${key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${model}",
+    "messages": [{"role": "user", "content": "Hello Pixel 6a over VPN!"}],
+    "stream": true
+  }'
+
+# 2. Python (Standard OpenAI SDK pointed at your Pixel 6a VPN / LAN IP)
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="${baseUrl}",
+    api_key="${key}"
+)
+
+response = client.chat.completions.create(
+    model="${model}",
+    messages=[{"role": "user", "content": "Explain Tensor GS101 core pinning."}]
+)
+print(response.choices[0].message.content)`;
+
+      document.getElementById('codeSnippetsBox').textContent = snippet;
+    }
+
+    function switchTab(activeTab) {
+      const tabs = {
+        chat: { btn: 'tabChatBtn', panel: 'panelChat', display: 'grid' },
+        embed: { btn: 'tabEmbedBtn', panel: 'panelEmbed', display: 'grid' },
+        voice: { btn: 'tabVoiceBtn', panel: 'panelVoice', display: 'grid' },
+        api: { btn: 'tabApiBtn', panel: 'panelApi', display: 'grid' }
+      };
+      Object.entries(tabs).forEach(([key, cfg]) => {
+        const btn = document.getElementById(cfg.btn);
+        const panel = document.getElementById(cfg.panel);
+        if (key === activeTab) {
+          btn.className = 'rounded-lg bg-blue-600 text-white px-3.5 py-1.5 text-xs font-semibold transition';
+          panel.classList.remove('hidden');
+          panel.classList.add(cfg.display);
+        } else {
+          btn.className = 'rounded-lg bg-slate-800/80 text-slate-300 hover:bg-slate-800 px-3.5 py-1.5 text-xs font-semibold transition';
+          panel.classList.add('hidden');
+          panel.classList.remove(cfg.display);
+        }
+      });
+      updateSnippets();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSettingsFromStorage();
+
+      document.getElementById('closeToastBtn').addEventListener('click', () => {
+        document.getElementById('toastBanner').classList.add('hidden');
+      });
+
+      document.getElementById('openLanHelpBtn').addEventListener('click', () => {
+        document.getElementById('modalDirectUrl').textContent = getBaseUrl() + '/';
+        document.getElementById('lanHelpModal').classList.remove('hidden');
+      });
+      document.getElementById('closeLanHelpBtn').addEventListener('click', () => {
+        document.getElementById('lanHelpModal').classList.add('hidden');
+      });
+      document.getElementById('modalDismissBtn').addEventListener('click', () => {
+        document.getElementById('lanHelpModal').classList.add('hidden');
+      });
+      document.getElementById('modalOpenDirectBtn').addEventListener('click', () => {
+        window.open(getBaseUrl() + '/', '_blank');
+      });
+      document.getElementById('openDirectHttpBtn').addEventListener('click', () => {
+        window.open(getBaseUrl() + '/', '_blank');
+      });
+      document.getElementById('copyVpnShareLinkBtn').addEventListener('click', copyPrivateVpnShareLink);
+
+      document.getElementById('vpnProtocolSelect').addEventListener('change', (e) => {
+        const proto = e.target.value;
+        const hostInput = document.getElementById('wifiHostInput');
+        if (proto === 'tailscale' && hostInput.value.startsWith('192.168.')) {
+          hostInput.placeholder = '100.x.y.z:8080';
+        } else if (proto === 'wireguard') {
+          hostInput.placeholder = '10.0.0.2:8080';
+        } else if (proto === 'openvpn') {
+          hostInput.placeholder = '10.8.0.2:8080';
+        } else if (proto === 'ts_https') {
+          hostInput.placeholder = 'pixel6a.tailnet-name.ts.net';
+        } else if (proto === 'wifi') {
+          hostInput.placeholder = '192.168.1.42:8080';
+        }
+        document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
+        updateSnippets();
+      });
+
+      document.getElementById('vpnProfileSelect').addEventListener('change', (e) => {
+        const idx = parseInt(e.target.value, 10);
+        const prof = state.profiles[idx];
+        if (prof) {
+          document.getElementById('wifiHostInput').value = prof.host;
+          document.getElementById('vpnProtocolSelect').value = prof.proto || 'tailscale';
+          if (prof.key) document.getElementById('apiKeyInput').value = prof.key;
+          document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
+          updateSnippets();
+          showToast('Switched to VPN profile: ' + prof.name);
+        }
+      });
+
+      document.getElementById('saveProfileBtn').addEventListener('click', saveCurrentProfile);
+
+      document.getElementById('toggleKeyVisBtn').addEventListener('click', (e) => {
+        const input = document.getElementById('apiKeyInput');
+        if (input.type === 'password') {
+          input.type = 'text';
+          e.target.textContent = 'Hide';
+        } else {
+          input.type = 'password';
+          e.target.textContent = 'Show';
+        }
+      });
+
+      document.getElementById('wifiHostInput').addEventListener('input', () => {
+        document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
+        updateSnippets();
+      });
+      document.getElementById('apiKeyInput').addEventListener('input', updateSnippets);
+      document.getElementById('modelSelect').addEventListener('change', updateSnippets);
+
+      document.getElementById('connectBtn').addEventListener('click', connectToPixelServer);
+
+      document.getElementById('tabChatBtn').addEventListener('click', () => switchTab('chat'));
+      document.getElementById('tabEmbedBtn').addEventListener('click', () => switchTab('embed'));
+      document.getElementById('tabVoiceBtn').addEventListener('click', () => switchTab('voice'));
+      document.getElementById('tabApiBtn').addEventListener('click', () => switchTab('api'));
+
+      document.getElementById('tempSlider').addEventListener('input', (e) => {
+        document.getElementById('tempValLabel').textContent = Number(e.target.value).toFixed(2);
+      });
+      document.getElementById('maxTokensSlider').addEventListener('input', (e) => {
+        document.getElementById('maxTokensValLabel').textContent = e.target.value;
+      });
+
+      document.getElementById('chatImageFileInput').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) analyzeImageOnClient(file);
+      });
+      document.getElementById('removeChatImageBtn').addEventListener('click', () => {
+        state.attachedImageDataUrl = null;
+        state.attachedImageReport = null;
+        document.getElementById('chatImagePreviewWrap').classList.add('hidden');
+        document.getElementById('chatImageFileInput').value = '';
+      });
+
+      document.getElementById('sendChatBtn').addEventListener('click', sendChatCompletion);
+      document.getElementById('clearChatBtn').addEventListener('click', () => {
+        document.getElementById('chatMessagesBox').innerHTML = '';
+        showToast('Cleared chat history');
+      });
+
+      document.getElementById('runEmbedBtn').addEventListener('click', runEmbeddingsPlayground);
+
+      document.getElementById('runTtsBtn').addEventListener('click', synthesizeTtsSpeech);
+      document.getElementById('audioFileUpload').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) transcribeAudioBlob(file, file.name);
+      });
+      document.getElementById('recordAudioBtn').addEventListener('click', async () => {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          const simBlob = generateClientSideWav('Simulated microphone voice clip');
+          transcribeAudioBlob(simBlob, 'mic_recording.wav');
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const recorder = new MediaRecorder(stream);
+          const chunks = [];
+          recorder.ondataavailable = (ev) => chunks.push(ev.data);
+          recorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            transcribeAudioBlob(blob, 'mic_clip.webm');
+          };
+          recorder.start();
+          showToast('Recording microphone for 3 seconds...');
+          setTimeout(() => {
+            if (recorder.state === 'recording') recorder.stop();
+          }, 3000);
+        } catch (e) {
+          const simBlob = generateClientSideWav('Fallback mic clip');
+          transcribeAudioBlob(simBlob, 'mic_fallback.wav');
+        }
+      });
+
+      document.getElementById('copySnippetBtn').addEventListener('click', () => {
+        copyTextSafe(document.getElementById('codeSnippetsBox').textContent);
+      });
+    });
+  </script>
+</body>
+</html>

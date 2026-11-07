@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pixel 6a TensorAI Node — Local Wi-Fi OpenAI Web Console</title>
+  <title>Pixel 6a TensorAI Node v0.3 — Universal VPN &amp; Wi-Fi OpenAI Web Console</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -54,25 +54,26 @@
     </div>
   </div>
 
-  <!-- Mixed-Content / LAN Helper Modal -->
+  <!-- Universal VPN & HTTPS Helper Modal -->
   <div id="lanHelpModal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-card rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+    <div class="glass-card rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="text-base font-semibold text-white">Connecting from GitHub Pages (HTTPS) to Local Wi-Fi (HTTP)</h3>
+        <h3 class="text-base font-semibold text-white">Universal Multi-User VPN &amp; Wi-Fi Architecture (v0.3)</h3>
         <button id="closeLanHelpBtn" type="button" class="text-slate-400 hover:text-white text-sm font-mono">✕</button>
       </div>
       <div class="text-xs text-slate-300 space-y-3 leading-relaxed">
         <p>
-          Your Pixel 6a hosts its OpenAI server on your local Wi-Fi over <code class="text-blue-400 font-mono">http://&lt;pixel-ip&gt;:8080</code>.
-          When opening this web app via <code class="text-emerald-400 font-mono">https://blackx16.github.io</code>, some browsers block HTTPS pages from fetching plain HTTP local IPs by default.
+          Because this GitHub Pages app (<code class="text-emerald-400 font-mono">https://blackx16.github.io</code>) runs 100% inside <strong>your own browser's OS networking stack</strong>, multiple people can open this exact URL at the same time while connected to their own independent VPNs (<strong>Tailscale</strong>, <strong>WireGuard</strong>, <strong>ZeroTier</strong>, or <strong>OpenVPN</strong>). Each user's requests route strictly through their own virtual <code class="text-blue-400 font-mono">tun0</code> tunnel to their own phone!
         </p>
-        <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-2">
-          <div class="font-semibold text-blue-400">Option 1 (Fastest — Direct Local Wi-Fi Web UI):</div>
-          <p>The Pixel 6a app also serves this exact web console directly over HTTP! Click <strong>Open Direct on Phone IP</strong> (or visit <code id="modalDirectUrl" class="text-emerald-300 font-mono">http://192.168.1.42:8080/</code>) in your browser.</p>
+        <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-1.5">
+          <div class="font-semibold text-emerald-400">Step 1 — Start Your VPN on Both Devices:</div>
+          <p>Turn on <strong>Tailscale</strong> (assigns a <code class="font-mono text-slate-200">100.x.y.z</code> CGNAT IP), <strong>WireGuard</strong> (<code class="font-mono text-slate-200">10.x.x.x</code>), <strong>ZeroTier</strong>, or <strong>OpenVPN</strong> on your Pixel 6a and on the laptop/phone viewing this page. In the Pixel 6a app (v0.3), Section 1 automatically detects your <code class="font-mono text-blue-300">tun0</code> VPN IP!</p>
         </div>
-        <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-2">
-          <div class="font-semibold text-blue-400">Option 2 (Allow Insecure Content on GitHub Pages):</div>
-          <p>In Chrome/Edge/Brave desktop or Android, tap the <strong>Site Info / Lock icon</strong> next to the address bar → <strong>Site settings</strong> → set <strong>Insecure content</strong> (and <strong>Local network access</strong>) to <strong>Allow</strong>.</p>
+        <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-1.5">
+          <div class="font-semibold text-blue-400">Step 2 — Bypass Browser HTTPS-to-HTTP Mixed Content (Choose Any):</div>
+          <p><strong>A. Direct In-Tunnel Web UI (Zero Config):</strong> Click <strong>Open Direct on Phone IP</strong> to open this exact console served directly by your Pixel 6a over the encrypted VPN tunnel (<code id="modalDirectUrl" class="text-emerald-300 font-mono">http://100.64.0.1:8080/</code>).</p>
+          <p><strong>B. Allow Local/VPN HTTP on GitHub Pages:</strong> Click the <strong>Lock / Tune icon</strong> in your browser address bar → <strong>Site settings</strong> → set <strong>Insecure content</strong> &amp; <strong>Local network access</strong> to <strong>Allow</strong>.</p>
+          <p><strong>C. Tailscale HTTPS (<code class="font-mono">*.ts.net</code>):</strong> Enter your Tailscale HTTPS hostname (<code class="font-mono text-slate-200">https://pixel6a.tailnet.ts.net</code>) in the host box.</p>
         </div>
       </div>
       <div class="flex justify-end gap-2 pt-2">
@@ -82,20 +83,21 @@
     </div>
   </div>
 
-  <!-- Top Header & Wi-Fi Connection Bar -->
+  <!-- Top Header & Universal Multi-VPN Connection Bar -->
   <header class="border-b border-slate-800/80 bg-[#0d1117]/95 sticky top-0 z-30 backdrop-blur">
-    <div class="max-w-7xl mx-auto px-4 py-3 space-y-3">
+    <div class="max-w-7xl mx-auto px-4 py-3 space-y-2.5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center font-mono font-bold text-slate-950 text-sm shadow">
-            G6a
+            v0.3
           </div>
           <div>
             <div class="flex items-center gap-2">
               <h1 class="text-sm sm:text-base font-bold tracking-tight text-white">Pixel 6a TensorAI Node</h1>
-              <span class="rounded-full bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 text-[10px] font-mono text-blue-400">Android 17 • API 37</span>
+              <span class="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono text-emerald-400">Universal Multi-VPN • v0.3</span>
+              <span class="hidden sm:inline-block rounded-full bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 text-[10px] font-mono text-blue-400">Android 17 • API 37</span>
             </div>
-            <p class="text-[11px] text-slate-400 font-mono">Google Tensor GS101 (0xF0 Big Cores) • LiteRT + ONNX Local Wi-Fi OpenAI Host</p>
+            <p class="text-[11px] text-slate-400 font-mono">Tailscale (100.64/10) • WireGuard • ZeroTier • OpenVPN • Local Wi-Fi OpenAI Host</p>
           </div>
         </div>
 
@@ -105,27 +107,41 @@
             <span id="statusDot" class="h-2 w-2 rounded-full bg-amber-400"></span>
             <span id="statusText">Not Connected (Demo Fallback Active)</span>
           </div>
+          <button id="copyVpnShareLinkBtn" type="button" class="rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 px-2.5 py-1 text-xs font-mono text-emerald-300 transition" title="Copy private #vpn=... pairing link for your tunnel">
+            Share My VPN Link 🔗
+          </button>
           <button id="openLanHelpBtn" type="button" class="rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 text-xs font-mono text-slate-300 transition">
             Wi-Fi / HTTPS Help
           </button>
         </div>
       </div>
 
-      <!-- Wi-Fi Host IP & OpenAI Bearer Key Controls -->
+      <!-- Universal VPN Protocol + Host + Bearer Key Controls -->
       <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
-        <div class="md:col-span-4 flex items-center gap-2">
-          <label for="wifiHostInput" class="text-[11px] font-mono text-slate-400 shrink-0">Wi-Fi IP:Port</label>
+        <div class="md:col-span-3 flex items-center gap-1.5">
+          <label for="vpnProtocolSelect" class="text-[11px] font-mono text-slate-400 shrink-0">Tunnel</label>
+          <select id="vpnProtocolSelect" class="w-full rounded-lg bg-slate-950 border border-slate-700/80 px-2 py-1.5 text-xs font-mono text-emerald-300 focus:border-blue-500 focus:outline-none">
+            <option value="tailscale">Tailscale VPN (100.x.y.z)</option>
+            <option value="wireguard">WireGuard (10.x.x.x / wg0)</option>
+            <option value="openvpn">OpenVPN / ZeroTier (tun0)</option>
+            <option value="ts_https">Tailscale HTTPS (*.ts.net)</option>
+            <option value="wifi">Local Wi-Fi (192.168.x.x)</option>
+          </select>
+        </div>
+
+        <div class="md:col-span-3 flex items-center gap-1.5">
+          <label for="wifiHostInput" class="text-[11px] font-mono text-slate-400 shrink-0">VPN/LAN IP</label>
           <input
             id="wifiHostInput"
             type="text"
-            value="192.168.1.42:8080"
-            placeholder="e.g. 192.168.1.42:8080"
+            value="100.101.102.103:8080"
+            placeholder="100.x.y.z:8080 or 192.168.1.x:8080"
             class="w-full rounded-lg bg-slate-950 border border-slate-700/80 px-2.5 py-1.5 text-xs font-mono text-white focus:border-blue-500 focus:outline-none"
           />
         </div>
 
-        <div class="md:col-span-4 flex items-center gap-2">
-          <label for="apiKeyInput" class="text-[11px] font-mono text-slate-400 shrink-0">Bearer Key</label>
+        <div class="md:col-span-3 flex items-center gap-1.5">
+          <label for="apiKeyInput" class="text-[11px] font-mono text-slate-400 shrink-0">Key</label>
           <input
             id="apiKeyInput"
             type="password"
@@ -138,24 +154,33 @@
           </button>
         </div>
 
-        <div class="md:col-span-4 flex flex-wrap items-center justify-end gap-1.5">
+        <div class="md:col-span-3 flex flex-wrap items-center justify-end gap-1.5">
           <button id="connectBtn" type="button" class="flex-1 sm:flex-none rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition shadow">
             Connect to Pixel 6a
           </button>
-          <button id="openDirectHttpBtn" type="button" class="rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 px-2.5 py-1.5 text-xs font-mono text-blue-300 transition" title="Open directly served from Pixel 6a HTTP server">
+          <button id="openDirectHttpBtn" type="button" class="rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 px-2.5 py-1.5 text-xs font-mono text-blue-300 transition" title="Open Web Console directly inside your VPN/LAN HTTP tunnel">
             Direct HTTP ↗
           </button>
-          <label class="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 cursor-pointer ml-1">
+          <label class="flex items-center gap-1 text-[11px] font-mono text-slate-400 cursor-pointer">
             <input id="demoFallbackToggle" type="checkbox" checked class="rounded border-slate-700 bg-slate-950 text-blue-500" />
-            <span>Sim Fallback</span>
+            <span>Sim</span>
           </label>
         </div>
       </div>
 
-      <!-- Hardware Telemetry Strip -->
+      <!-- Multi-User Isolated VPN Profile Switcher & Telemetry Strip -->
       <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-400 px-1">
-        <div id="telemetryHardware">Device: Google Pixel 6a (bluejay) • SoC: Tensor GS101 (2x X1 + 2x A76 @ 0xF0)</div>
-        <div id="telemetryMemory">AnonRSS: -- MB | mmap(RssFile): -- MB | Endpoint: <span id="activeBaseUrlLabel" class="text-blue-400">http://192.168.1.42:8080/v1</span></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span>Saved VPN Profiles (Browser-Isolated):</span>
+          <select id="vpnProfileSelect" class="rounded bg-slate-900 border border-slate-700 px-2 py-0.5 text-[11px] font-mono text-slate-200">
+            <option value="default">Default Profile</option>
+          </select>
+          <button id="saveProfileBtn" type="button" class="rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 text-[10px] text-blue-300">
+            + Save Current VPN Profile
+          </button>
+        </div>
+        <div id="telemetryHardware" class="hidden xl:block">SoC: Tensor GS101 (0xF0)</div>
+        <div id="telemetryMemory">AnonRSS: -- MB | mmap: -- MB | Active Tunnel: <span id="activeBaseUrlLabel" class="text-emerald-400">http://100.101.102.103:8080/v1</span></div>
       </div>
     </div>
   </header>
@@ -199,8 +224,8 @@
       <div class="lg:col-span-8 glass-card rounded-2xl p-4 flex flex-col justify-between min-h-[460px]">
         <div id="chatMessagesBox" class="space-y-3 overflow-y-auto max-h-[380px] pr-1">
           <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 text-xs leading-relaxed text-slate-300">
-            <div class="font-mono text-[11px] text-blue-400 mb-1">SYSTEM • PIXEL 6A TENSOR GS101 NODE</div>
-            Enter your Pixel 6a's Wi-Fi IP above (shown under <strong>Section 1</strong> in the Android app) and click <strong>Connect to Pixel 6a</strong>. You can send text prompts, attach images for Vision analysis &amp; 384-D visual embeddings, or stream tokens over SSE.
+            <div class="font-mono text-[11px] text-emerald-400 mb-1">UNIVERSAL MULTI-USER VPN &amp; LAN ROUTER • v0.3</div>
+            Connect your phone and this browser to your own <strong>Tailscale</strong> (<code class="font-mono text-blue-300">100.x.y.z:8080</code>), <strong>WireGuard</strong> (<code class="font-mono text-blue-300">10.x.x.x:8080</code>), <strong>ZeroTier</strong>, or <strong>OpenVPN</strong> tunnel (or Local Wi-Fi), enter your phone's IP above, and click <strong>Connect to Pixel 6a</strong>. Every visitor's browser routes exclusively through their own local VPN interface—so multiple people can use this GitHub Pages web app at the same time on their own VPNs!
           </div>
         </div>
 
@@ -221,9 +246,9 @@
           <textarea
             id="chatPromptInput"
             rows="2"
-            placeholder="Ask Gemma 4 E2B (LiteRT) or Qwen2.5 (ONNX) anything, or attach an image..."
+            placeholder="Ask Gemma 4 E2B (LiteRT) or Qwen2.5 (ONNX) anything over your VPN tunnel, or attach an image..."
             class="w-full rounded-xl bg-slate-950 border border-slate-700/80 p-3 text-xs text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none resize-none"
-          >Explain how the Pixel 6a Tensor GS101 pins LLM threads to the 2x Cortex-X1 and 2x Cortex-A76 cores.</textarea>
+          >Explain how Tailscale CGNAT (100.64.0.0/10) and Tensor GS101 big-core pinning work together in v0.3.</textarea>
 
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-2">
@@ -284,12 +309,12 @@
     <section id="panelEmbed" class="hidden grid-cols-1 lg:grid-cols-12 gap-4">
       <div class="lg:col-span-5 glass-card rounded-2xl p-4 space-y-3">
         <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Embeddings Input (/v1/embeddings)</h2>
-        <p class="text-xs text-slate-400">Enter 2 or more lines of text to compute L2-normalized semantic embeddings on your Pixel 6a (<code class="text-slate-200 font-mono">all-minilm-l6-v2-onnx</code> or <code class="text-slate-200 font-mono">universal-sentence-encoder-litert</code>) and compare their pairwise cosine similarity.</p>
+        <p class="text-xs text-slate-400">Enter 2 or more lines of text to compute L2-normalized semantic embeddings on your Pixel 6a (<code class="text-slate-200 font-mono">all-minilm-l6-v2-onnx</code> or <code class="text-slate-200 font-mono">universal-sentence-encoder-litert</code>) over your VPN tunnel and compare their pairwise cosine similarity.</p>
         <textarea
           id="embedLinesInput"
           rows="5"
           class="w-full rounded-xl bg-slate-950 border border-slate-700/80 p-3 text-xs font-mono text-white focus:border-blue-500 focus:outline-none"
-        >Google Pixel 6a Tensor GS101 on-device AI server
+        >Google Pixel 6a Tensor GS101 on-device AI server over Tailscale VPN
 Running quantized LiteRT and ONNX neural networks on mobile
 Baking sourdough bread in a cast iron Dutch oven</textarea>
         <button id="runEmbedBtn" type="button" class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-semibold text-white shadow transition">
@@ -312,7 +337,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
     <section id="panelVoice" class="hidden grid-cols-1 md:grid-cols-2 gap-4">
       <div class="glass-card rounded-2xl p-4 space-y-3">
         <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Speech-to-Text (/v1/audio/transcriptions)</h2>
-        <p class="text-xs text-slate-400">Record from your microphone or upload a WAV/audio clip to transcribe via <strong>Whisper Tiny INT8 ONNX</strong> on the Pixel 6a.</p>
+        <p class="text-xs text-slate-400">Record from your microphone or upload a WAV/audio clip to transcribe via <strong>Whisper Tiny INT8 ONNX</strong> on the Pixel 6a over VPN/LAN.</p>
         <div class="flex flex-wrap items-center gap-2 pt-1">
           <button id="recordAudioBtn" type="button" class="rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-semibold text-white transition">
             ● Record Mic (3s Clip)
@@ -332,7 +357,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
           id="ttsInputText"
           rows="3"
           class="w-full rounded-xl bg-slate-950 border border-slate-700/80 p-3 text-xs text-white focus:border-blue-500 focus:outline-none"
-        >Hello from the Google Pixel 6a Tensor GS101 local AI server running on Android 17.</textarea>
+        >Hello from the Google Pixel 6a Tensor GS101 local AI server over our encrypted VPN mesh.</textarea>
         <div class="flex items-center justify-between gap-3">
           <button id="runTtsBtn" type="button" class="rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition">
             Synthesize &amp; Play WAV
@@ -346,7 +371,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
     <section id="panelApi" class="hidden grid-cols-1 gap-4">
       <div class="glass-card rounded-2xl p-4 space-y-3">
         <div class="flex items-center justify-between">
-          <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Ready-to-Use OpenAI Client Code (Pre-Filled with Your Wi-Fi IP &amp; Key)</h2>
+          <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Ready-to-Use OpenAI Client Code (Pre-Filled with Your VPN/Wi-Fi IP &amp; Key)</h2>
           <button id="copySnippetBtn" type="button" class="rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-1 text-xs font-mono text-white">
             Copy Code
           </button>
@@ -359,12 +384,13 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
 
   <script>
     const state = {
-      host: '192.168.1.42:8080',
+      host: '100.101.102.103:8080',
       apiKey: 'sk-pixel6a-tensor',
+      protocol: 'tailscale',
       isConnected: false,
       attachedImageDataUrl: null,
       attachedImageReport: null,
-      chatHistory: []
+      profiles: []
     };
 
     function showToast(msg) {
@@ -402,44 +428,121 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
 
     function getCleanBaseHost() {
       const raw = document.getElementById('wifiHostInput').value.trim()
-        .replace(/^https?:\/\//i, '')
         .replace(/\/v1\/?$/i, '')
         .replace(/\/+$/, '');
-      return raw || '192.168.1.42:8080';
+      return raw || '100.101.102.103:8080';
     }
 
     function getBaseUrl() {
-      return 'http://' + getCleanBaseHost();
+      const raw = getCleanBaseHost();
+      const proto = document.getElementById('vpnProtocolSelect').value;
+      if (/^https?:\/\//i.test(raw)) {
+        return raw;
+      }
+      if (proto === 'ts_https' || raw.endsWith('.ts.net')) {
+        return 'https://' + raw;
+      }
+      return 'http://' + raw;
+    }
+
+    function parseUrlParamsAndHash() {
+      const hashStr = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+      const hashParams = new URLSearchParams(hashStr);
+      const searchParams = new URLSearchParams(window.location.search);
+
+      return {
+        vpn: hashParams.get('vpn') || hashParams.get('host') || searchParams.get('vpn') || searchParams.get('host'),
+        key: hashParams.get('key') || searchParams.get('key'),
+        proto: hashParams.get('proto') || searchParams.get('proto')
+      };
     }
 
     function saveSettingsToStorage() {
       try {
         localStorage.setItem('pixel6a_wifi_host', getCleanBaseHost());
         localStorage.setItem('pixel6a_api_key', document.getElementById('apiKeyInput').value.trim());
+        localStorage.setItem('pixel6a_vpn_proto', document.getElementById('vpnProtocolSelect').value);
       } catch (e) {}
     }
 
-    function loadSettingsFromStorage() {
+    function loadProfilesFromStorage() {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const qHost = params.get('host');
-        const qKey = params.get('key');
-        if (qHost) {
-          document.getElementById('wifiHostInput').value = qHost;
+        const raw = localStorage.getItem('pixel6a_vpn_profiles');
+        state.profiles = raw ? JSON.parse(raw) : [
+          { name: 'Tailscale Mesh (100.x.y.z)', host: '100.101.102.103:8080', proto: 'tailscale', key: 'sk-pixel6a-tensor' },
+          { name: 'WireGuard Tunnel (10.0.0.2)', host: '10.0.0.2:8080', proto: 'wireguard', key: 'sk-pixel6a-tensor' },
+          { name: 'OpenVPN Tunnel (10.8.0.2)', host: '10.8.0.2:8080', proto: 'openvpn', key: 'sk-pixel6a-tensor' },
+          { name: 'Local Wi-Fi (192.168.1.42)', host: '192.168.1.42:8080', proto: 'wifi', key: 'sk-pixel6a-tensor' }
+        ];
+      } catch (e) {
+        state.profiles = [];
+      }
+      renderProfileSelector();
+    }
+
+    function renderProfileSelector() {
+      const sel = document.getElementById('vpnProfileSelect');
+      sel.innerHTML = '';
+      state.profiles.forEach((p, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = `${p.name} [${p.host}]`;
+        sel.appendChild(opt);
+      });
+    }
+
+    function saveCurrentProfile() {
+      const host = getCleanBaseHost();
+      const proto = document.getElementById('vpnProtocolSelect').value;
+      const key = document.getElementById('apiKeyInput').value.trim() || 'sk-pixel6a-tensor';
+      const label = `${proto.toUpperCase()} (${host})`;
+      state.profiles.unshift({ name: label, host: host, proto: proto, key: key });
+      if (state.profiles.length > 10) state.profiles.pop();
+      try {
+        localStorage.setItem('pixel6a_vpn_profiles', JSON.stringify(state.profiles));
+      } catch (e) {}
+      renderProfileSelector();
+      showToast('Saved VPN profile "' + label + '" to this browser!');
+    }
+
+    function loadSettingsFromStorage() {
+      loadProfilesFromStorage();
+      try {
+        const incoming = parseUrlParamsAndHash();
+        if (incoming.proto) {
+          document.getElementById('vpnProtocolSelect').value = incoming.proto;
+        } else {
+          const savedProto = localStorage.getItem('pixel6a_vpn_proto');
+          if (savedProto) document.getElementById('vpnProtocolSelect').value = savedProto;
+        }
+
+        if (incoming.vpn) {
+          document.getElementById('wifiHostInput').value = incoming.vpn;
         } else if (window.location.protocol === 'http:' && window.location.host && !window.location.host.includes('github.io')) {
           document.getElementById('wifiHostInput').value = window.location.host;
         } else {
           const savedHost = localStorage.getItem('pixel6a_wifi_host');
           if (savedHost) document.getElementById('wifiHostInput').value = savedHost;
         }
-        if (qKey) {
-          document.getElementById('apiKeyInput').value = qKey;
+
+        if (incoming.key) {
+          document.getElementById('apiKeyInput').value = incoming.key;
         } else {
           const savedKey = localStorage.getItem('pixel6a_api_key');
           if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
         }
       } catch (e) {}
+      document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
       updateSnippets();
+    }
+
+    function copyPrivateVpnShareLink() {
+      const host = encodeURIComponent(getCleanBaseHost());
+      const key = encodeURIComponent(document.getElementById('apiKeyInput').value.trim() || 'sk-pixel6a-tensor');
+      const proto = encodeURIComponent(document.getElementById('vpnProtocolSelect').value);
+      const basePage = 'https://blackx16.github.io/pixel6a-tensor-ai-node/';
+      const shareUrl = `${basePage}#vpn=${host}&key=${key}&proto=${proto}`;
+      copyTextSafe(shareUrl);
     }
 
     function updateConnectionUi(connected, detailText) {
@@ -453,7 +556,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
       if (connected) {
         badge.className = 'flex items-center gap-2 rounded-full bg-emerald-500/15 border border-emerald-500/40 px-3 py-1 text-xs font-mono text-emerald-300';
         dot.className = 'h-2 w-2 rounded-full bg-emerald-400 animate-pulse';
-        text.textContent = detailText || ('Connected to ' + getCleanBaseHost());
+        text.textContent = detailText || ('VPN/LAN Connected: ' + getCleanBaseHost());
       } else {
         badge.className = 'flex items-center gap-2 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-mono text-amber-300';
         dot.className = 'h-2 w-2 rounded-full bg-amber-400';
@@ -466,7 +569,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
       saveSettingsToStorage();
       const baseUrl = getBaseUrl();
       const key = document.getElementById('apiKeyInput').value.trim();
-      updateConnectionUi(false, 'Connecting to ' + baseUrl + '...');
+      updateConnectionUi(false, 'Dialing VPN/LAN ' + baseUrl + '...');
 
       try {
         const healthResp = await fetch(baseUrl + '/health', {
@@ -477,10 +580,10 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
         const health = await healthResp.json();
 
         document.getElementById('telemetryHardware').textContent =
-          'Device: ' + (health.device || 'Pixel 6a') + ' • SoC: ' + (health.soc || 'Tensor GS101') + ' • ' + (health.os || 'Android 17');
+          'Device: ' + (health.device || 'Pixel 6a') + ' • ' + (health.vpn_status || 'VPN/LAN Ready');
         document.getElementById('telemetryMemory').innerHTML =
-          'AnonRSS: <strong>' + (health.rss_anon_mb ?? 0) + ' MB</strong> | mmap(RssFile): <strong>' +
-          (health.rss_file_mmap_mb ?? 0) + ' MB</strong> | Endpoint: <span id="activeBaseUrlLabel" class="text-emerald-400">' + baseUrl + '/v1</span>';
+          'AnonRSS: <strong>' + (health.rss_anon_mb ?? 0) + ' MB</strong> | mmap: <strong>' +
+          (health.rss_file_mmap_mb ?? 0) + ' MB</strong> | Tunnel: <span id="activeBaseUrlLabel" class="text-emerald-400">' + baseUrl + '/v1</span>';
 
         const modelsResp = await fetch(baseUrl + '/v1/models', {
           method: 'GET',
@@ -507,12 +610,12 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
           }
         }
 
-        updateConnectionUi(true, 'LIVE ON PIXEL 6A (' + getCleanBaseHost() + ')');
-        showToast('Connected to Pixel 6a OpenAI Server!');
+        updateConnectionUi(true, 'LIVE OVER VPN/LAN (' + getCleanBaseHost() + ')');
+        showToast('Connected to Pixel 6a over ' + document.getElementById('vpnProtocolSelect').value.toUpperCase() + '!');
       } catch (err) {
-        const isHttpsPage = window.location.protocol === 'https:';
+        const isHttpsPage = window.location.protocol === 'https:' && baseUrl.startsWith('http://');
         const hint = isHttpsPage
-          ? 'Blocked by HTTPS->HTTP rules or server unreachable. Click "Wi-Fi / HTTPS Help".'
+          ? 'HTTPS->HTTP blocked or VPN unreachable. Click "Direct HTTP ↗" or "Wi-Fi / HTTPS Help".'
           : 'Unreachable (' + err.message + '). Sim Fallback active.';
         updateConnectionUi(false, hint);
         showToast(hint);
@@ -603,7 +706,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
 
       const header = document.createElement('div');
       header.className = 'font-mono text-[10px] mb-1 ' + (isUser ? 'text-blue-300' : 'text-emerald-400');
-      header.textContent = isUser ? 'YOU' : ('PIXEL 6A • ' + document.getElementById('modelSelect').value.toUpperCase());
+      header.textContent = isUser ? 'YOU' : ('PIXEL 6A (' + getCleanBaseHost() + ') • ' + document.getElementById('modelSelect').value.toUpperCase());
 
       const body = document.createElement('div');
       body.className = 'whitespace-pre-wrap leading-relaxed font-sans';
@@ -657,9 +760,9 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
         stream: stream
       };
 
-      const assistantBubble = appendChatBubble('assistant', 'Connecting to Pixel 6a...');
+      const assistantBubble = appendChatBubble('assistant', 'Routing over VPN/LAN tunnel to Pixel 6a...');
       const startMs = performance.now();
-      document.getElementById('chatMetricsLabel').textContent = 'Streaming from Pixel 6a...';
+      document.getElementById('chatMetricsLabel').textContent = 'Streaming over tunnel...';
 
       try {
         const resp = await fetch(getBaseUrl() + '/v1/chat/completions', {
@@ -712,16 +815,17 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
           const elapsedSec = ((performance.now() - startMs) / 1000).toFixed(2);
           document.getElementById('chatMetricsLabel').textContent = `Completed in ${elapsedSec}s`;
         }
-        updateConnectionUi(true, 'LIVE ON PIXEL 6A (' + getCleanBaseHost() + ')');
+        updateConnectionUi(true, 'LIVE OVER VPN/LAN (' + getCleanBaseHost() + ')');
       } catch (err) {
         if (document.getElementById('demoFallbackToggle').checked) {
+          const protoName = document.getElementById('vpnProtocolSelect').value.toUpperCase();
           const simText = state.attachedImageReport
-            ? `=== On-Device Vision & 384-D Image Embedding Output (${model}) ===\n${state.attachedImageReport.summary}\n\nPrompt Analysis ("${prompt}"):\nProcessed ${state.attachedImageReport.width}x${state.attachedImageReport.height} image frame on Google Tensor GS101 (Mali-G78 MP20 + 0xF0 Big Cores).`
-            : `[Simulated Pixel 6a Response • ${model}]\nTo run against your physical phone over Wi-Fi, ensure "START WI-FI SERVER" is active in the Pixel 6a app and your browser can reach ${getBaseUrl()}/v1.\n\nAnswer for "${prompt}":\nThe Pixel 6a's Google Tensor GS101 pins 4 worker threads to cpu4..cpu7 (2x Cortex-X1 + 2x Cortex-A76) via sched_setaffinity(0xF0) and maps weights via read-only mmap (RssFile) to stay within Android 17's 6 GB RAM ceiling.`;
+            ? `=== On-Device Vision & 384-D Image Embedding Output (${model} via ${protoName}) ===\n${state.attachedImageReport.summary}\n\nPrompt Analysis ("${prompt}"):\nProcessed ${state.attachedImageReport.width}x${state.attachedImageReport.height} image frame on Google Tensor GS101 (Mali-G78 MP20 + 0xF0 Big Cores).`
+            : `[Simulated Pixel 6a VPN Node • ${model} via ${protoName} (${getCleanBaseHost()})]\nTo query your live phone over ${protoName}, ensure your VPN is connected on both devices and "START SERVER" is active in the Pixel 6a v0.3 app (or click "Direct HTTP ↗" to open the console directly inside your VPN tunnel).\n\nAnswer for "${prompt}":\nIn v0.3, the Pixel 6a scans Android's ConnectivityManager (TRANSPORT_VPN) and NetworkInterface (tun0, wg0, tailscale0, zt*) for RFC 6598 CGNAT (100.64.0.0/10) and RFC 1918 tunnel IPs while binding ServerSocket to 0.0.0.0:8080—allowing every user on blackx16.github.io to route through their own private VPN simultaneously.`;
           assistantBubble.body.textContent = simText;
           document.getElementById('chatMetricsLabel').textContent = 'Simulated Fallback (46.2 tok/s)';
         } else {
-          assistantBubble.body.textContent = 'Request failed: ' + err.message + '. Enable "Sim Fallback" or check Wi-Fi IP / HTTPS settings.';
+          assistantBubble.body.textContent = 'Request failed: ' + err.message + '. Enable "Sim" fallback or click "Direct HTTP ↗".';
           document.getElementById('chatMetricsLabel').textContent = 'Connection error';
         }
       }
@@ -764,7 +868,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
       }
 
       const container = document.getElementById('embedMatrixContainer');
-      container.textContent = 'Computing embeddings on Pixel 6a...';
+      container.textContent = 'Computing embeddings on Pixel 6a over tunnel...';
       let vectors = [];
       let modelUsed = 'all-minilm-l6-v2-onnx';
 
@@ -893,7 +997,7 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
         const json = await resp.json();
         out.textContent = `Model: ${json.model}\nDuration: ${json.duration_ms} ms\n\nTranscript:\n${json.text}`;
       } catch (e) {
-        out.textContent = `[Simulated Whisper Tiny INT8 ONNX Transcript for ${labelName}]\n"Testing local voice transcription on Google Pixel 6a Tensor GS101."`;
+        out.textContent = `[Simulated Whisper Tiny INT8 ONNX Transcript for ${labelName}]\n"Testing local voice transcription on Google Pixel 6a Tensor GS101 over VPN."`;
       }
     }
 
@@ -902,17 +1006,17 @@ Baking sourdough bread in a cast iron Dutch oven</textarea>
       const key = document.getElementById('apiKeyInput').value.trim() || 'sk-pixel6a-tensor';
       const model = document.getElementById('modelSelect').value || 'gemma-4-e2b-it-litert';
 
-      const snippet = `# 1. cURL (Streaming Chat Completion over Local Wi-Fi)
+      const snippet = `# 1. cURL (Streaming Chat Completion over Tailscale / WireGuard / OpenVPN / Wi-Fi)
 curl ${baseUrl}/chat/completions \\
   -H "Authorization: Bearer ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "model": "${model}",
-    "messages": [{"role": "user", "content": "Hello Pixel 6a!"}],
+    "messages": [{"role": "user", "content": "Hello Pixel 6a over VPN!"}],
     "stream": true
   }'
 
-# 2. Python (Standard OpenAI SDK pointed at your Pixel 6a Wi-Fi IP)
+# 2. Python (Standard OpenAI SDK pointed at your Pixel 6a VPN / LAN IP)
 from openai import OpenAI
 
 client = OpenAI(
@@ -975,6 +1079,40 @@ print(response.choices[0].message.content)`;
       document.getElementById('openDirectHttpBtn').addEventListener('click', () => {
         window.open(getBaseUrl() + '/', '_blank');
       });
+      document.getElementById('copyVpnShareLinkBtn').addEventListener('click', copyPrivateVpnShareLink);
+
+      document.getElementById('vpnProtocolSelect').addEventListener('change', (e) => {
+        const proto = e.target.value;
+        const hostInput = document.getElementById('wifiHostInput');
+        if (proto === 'tailscale' && hostInput.value.startsWith('192.168.')) {
+          hostInput.placeholder = '100.x.y.z:8080';
+        } else if (proto === 'wireguard') {
+          hostInput.placeholder = '10.0.0.2:8080';
+        } else if (proto === 'openvpn') {
+          hostInput.placeholder = '10.8.0.2:8080';
+        } else if (proto === 'ts_https') {
+          hostInput.placeholder = 'pixel6a.tailnet-name.ts.net';
+        } else if (proto === 'wifi') {
+          hostInput.placeholder = '192.168.1.42:8080';
+        }
+        document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
+        updateSnippets();
+      });
+
+      document.getElementById('vpnProfileSelect').addEventListener('change', (e) => {
+        const idx = parseInt(e.target.value, 10);
+        const prof = state.profiles[idx];
+        if (prof) {
+          document.getElementById('wifiHostInput').value = prof.host;
+          document.getElementById('vpnProtocolSelect').value = prof.proto || 'tailscale';
+          if (prof.key) document.getElementById('apiKeyInput').value = prof.key;
+          document.getElementById('activeBaseUrlLabel').textContent = getBaseUrl() + '/v1';
+          updateSnippets();
+          showToast('Switched to VPN profile: ' + prof.name);
+        }
+      });
+
+      document.getElementById('saveProfileBtn').addEventListener('click', saveCurrentProfile);
 
       document.getElementById('toggleKeyVisBtn').addEventListener('click', (e) => {
         const input = document.getElementById('apiKeyInput');
