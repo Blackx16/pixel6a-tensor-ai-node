@@ -3,6 +3,7 @@ package com.blackx16.tensorainode.engine
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
+import ai.onnxruntime.TensorInfo
 import com.blackx16.tensorainode.hardware.TensorHardwareOptimizer
 import com.blackx16.tensorainode.models.AiModelSpec
 import kotlinx.coroutines.flow.Flow
@@ -55,7 +56,12 @@ class OnnxInferenceEngine(
             setIntraOpNumThreads(TensorHardwareOptimizer.TENSOR_BIG_CORE_THREADS)
             setMemoryPatternOptimization(true)
             try {
-                addXnnpack(
+                val method = OrtSession.SessionOptions::class.java.getMethod(
+                    "addXnnpack",
+                    Map::class.java
+                )
+                method.invoke(
+                    this,
                     mapOf("intra_op_num_threads" to TensorHardwareOptimizer.TENSOR_BIG_CORE_THREADS.toString())
                 )
             } catch (_: Throwable) {
@@ -246,7 +252,8 @@ class OnnxInferenceEngine(
         session.run(inputs).use { results ->
             val logitsTensor = results[0] as OnnxTensor
             val floatBuf = logitsTensor.floatBuffer
-            val vocabSize = logitsTensor.info.shape.last().toInt()
+            val tensorInfo = logitsTensor.info as TensorInfo
+            val vocabSize = tensorInfo.shape.last().toInt()
             val lastTokenOffset = ((tokenIds.size - 1) * vocabSize).coerceAtLeast(0)
             var bestId = 0L
             var bestLogit = Float.NEGATIVE_INFINITY
@@ -311,7 +318,7 @@ class OnnxInferenceEngine(
 
             val pooled = session.run(feed).use { res ->
                 val outTensor = res[0] as OnnxTensor
-                val info = outTensor.info.shape
+                val info = (outTensor.info as TensorInfo).shape
                 val hiddenDim = info.last().toInt()
                 val buf = outTensor.floatBuffer
                 meanPoolAndNormalize(buf, tokenized.size, hiddenDim)
@@ -392,7 +399,7 @@ class OnnxInferenceEngine(
                 }
                 val nextId = decSession.run(inputs).use { out ->
                     val logits = out[0] as OnnxTensor
-                    val vocab = logits.info.shape.last().toInt()
+                    val vocab = (logits.info as TensorInfo).shape.last().toInt()
                     val buf = logits.floatBuffer
                     val offset = (tokens.size - 1) * vocab
                     var maxId = 50257L

@@ -56,6 +56,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cat << 'EOF' > release_notes.md
+          ### Pixel 6a TensorAI Node v0.1 (Signed ARM64 APK)
+          - **Target Hardware**: Google Pixel 6a (`bluejay`, Google Tensor GS101, Mali-G78 MP20 GPU, 6 GB RAM, 128 GB UFS 3.1)
+          - **OS Support**: Android 17 (`DP11.261016.003` / API 37) with `ACCESS_LOCAL_NETWORK` & 16 KB ELF page alignment
+          - **Runtimes Included**: Google LiteRT ('Lightartie') + Microsoft ONNX Runtime ('Onyx')
+          - **Capabilities**: Local Wi-Fi OpenAI Server (`/v1/chat/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`, `/v1/audio/speech`, `/v1/models`), Post-Install Web Model Downloader (0 MB bundled weights), and On-Device Direct Test Console.
+          EOF
           if gh release view v0.1 >/dev/null 2>&1; then
             gh release upload v0.1 pixel6a-tensor-ai-node-v0.1.apk pixel6a-tensor-ai-node-v0.1.apk.sha256 --clobber
           else
@@ -63,9 +70,5 @@ jobs:
               pixel6a-tensor-ai-node-v0.1.apk \
               pixel6a-tensor-ai-node-v0.1.apk.sha256 \
               --title "v0.1 — Pixel 6a TensorAI Node (Android 17 Local AI Server)" \
-              --notes "### Pixel 6a TensorAI Node v0.1 (Signed ARM64 APK)
-          - **Target Hardware**: Google Pixel 6a (\`bluejay\`, Google Tensor GS101, Mali-G78 MP20 GPU, 6 GB RAM, 128 GB UFS 3.1)
-          - **OS Support**: Android 17 (\`DP11.261016.003\` / API 37) with \`ACCESS_LOCAL_NETWORK\` & 16 KB ELF page alignment
-          - **Runtimes Included**: Google LiteRT ("Lightartie") + Microsoft ONNX Runtime ("Onyx")
-          - **Capabilities**: Local Wi-Fi OpenAI Server (\`/v1/chat/completions\`, \`/v1/embeddings\`, \`/v1/audio/transcriptions\`, \`/v1/audio/speech\`, \`/v1/models\`), Post-Install Web Model Downloader (0 MB bundled weights), and On-Device Direct Test Console."
+              --notes-file release_notes.md
           fi
