@@ -1,4 +1,4 @@
-name: Build APK & Deploy GitHub Pages Web Console
+name: Build APK (v0.3) & Deploy GitHub Pages Web Console
 
 on:
   push:
@@ -11,37 +11,13 @@ permissions:
   id-token: write
 
 jobs:
-  deploy-github-pages:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Pages (Auto-Enable)
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload Web Console Artifact (docs/)
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'docs'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
   build-and-release-apk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Bundle Web Console into Android Assets (assets/web/index.html)
+      - name: Bundle v0.3 Web Console into Android Assets (assets/web/index.html)
         run: |
           mkdir -p app/src/main/assets/web
           cp docs/index.html app/src/main/assets/web/index.html
@@ -77,21 +53,40 @@ jobs:
             -keypass pixel6a_tensor_pass \
             -dname "CN=Blackx16, OU=MobileAI, O=TensorAINode, L=Vadodara, S=GJ, C=IN"
 
-      - name: Run Unit Tests & Assemble Signed Release APK
+      - name: Run Unit Tests & Assemble Signed Release APK (v0.3)
         run: |
           gradle testDebugUnitTest assembleRelease --no-daemon --stacktrace
-          cp app/build/outputs/apk/release/app-release.apk pixel6a-tensor-ai-node-v0.1.apk
+          cp app/build/outputs/apk/release/app-release.apk pixel6a-tensor-ai-node-v0.3.apk
           cp app/build/outputs/apk/release/app-release.apk pixel6a-tensor-ai-node-v0.2.apk
-          sha256sum pixel6a-tensor-ai-node-v0.1.apk > pixel6a-tensor-ai-node-v0.1.apk.sha256
+          cp app/build/outputs/apk/release/app-release.apk pixel6a-tensor-ai-node-v0.1.apk
+          sha256sum pixel6a-tensor-ai-node-v0.3.apk > pixel6a-tensor-ai-node-v0.3.apk.sha256
           sha256sum pixel6a-tensor-ai-node-v0.2.apk > pixel6a-tensor-ai-node-v0.2.apk.sha256
+          sha256sum pixel6a-tensor-ai-node-v0.1.apk > pixel6a-tensor-ai-node-v0.1.apk.sha256
 
-      - name: Update v0.1 & v0.2 Releases with Bundled Web Console
+      - name: Publish GitHub Release v0.3 & Update v0.1/v0.2
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v0.1 >/dev/null 2>&1; then
-            gh release upload v0.1 pixel6a-tensor-ai-node-v0.1.apk pixel6a-tensor-ai-node-v0.1.apk.sha256 --clobber
+          cat << 'EOF' > release_notes_v03.md
+          ### Pixel 6a TensorAI Node v0.3 — Universal Multi-User VPN Mesh Edition (Signed ARM64 APK)
+          - **Universal Multi-User VPN Architecture (`tun0` / `wg0` / `tailscale0` / `zt*`)**: Automatically scans Android `ConnectivityManager` (`TRANSPORT_VPN`) and `NetworkInterface` for **Tailscale RFC 6598 CGNAT (`100.64.0.0/10`)**, **WireGuard (`10.x.x.x`)**, **ZeroTier**, and **OpenVPN** tunnel IPs alongside `wlan0` Wi-Fi.
+          - **Multi-Tenant Static GitHub Pages Integration**: Multiple users connected to their own independent VPNs can simultaneously use [`https://blackx16.github.io/pixel6a-tensor-ai-node/`](https://blackx16.github.io/pixel6a-tensor-ai-node/) without cross-talk, using browser-isolated VPN profiles or private `#vpn=<ip>:8080&key=<key>` URL hash pairing links.
+          - **Full In-Tunnel Web Console (`http://<vpn-ip>:8080/`)**: Bundles `assets/web/index.html` inside the APK so visiting `http://<vpn-ip>:8080/` over Tailscale/WireGuard/OpenVPN serves the complete web console directly over the encrypted tunnel with zero HTTPS-to-HTTP mixed-content blocks.
+          - **Includes all v0.2 Bugfixes**: Crash-proof "RUN ON PHONE" execution and immediate "+ IMAGE" Vision & 384-D visual embedding extraction.
+          EOF
+          if gh release view v0.3 >/dev/null 2>&1; then
+            gh release upload v0.3 pixel6a-tensor-ai-node-v0.3.apk pixel6a-tensor-ai-node-v0.3.apk.sha256 --clobber
+            gh release edit v0.3 --notes-file release_notes_v03.md
+          else
+            gh release create v0.3 \
+              pixel6a-tensor-ai-node-v0.3.apk \
+              pixel6a-tensor-ai-node-v0.3.apk.sha256 \
+              --title "v0.3 — Universal Multi-User VPN Mesh & GitHub Pages Edition" \
+              --notes-file release_notes_v03.md
           fi
           if gh release view v0.2 >/dev/null 2>&1; then
             gh release upload v0.2 pixel6a-tensor-ai-node-v0.2.apk pixel6a-tensor-ai-node-v0.2.apk.sha256 --clobber
+          fi
+          if gh release view v0.1 >/dev/null 2>&1; then
+            gh release upload v0.1 pixel6a-tensor-ai-node-v0.1.apk pixel6a-tensor-ai-node-v0.1.apk.sha256 --clobber
           fi

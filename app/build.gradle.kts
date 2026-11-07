@@ -10,20 +10,16 @@ android {
     defaultConfig {
         applicationId = "com.blackx16.tensorainode"
         minSdk = 31
-        // WHY: Compatible with Android 17 (API 37, build DP11.261016.003) on Pixel 6a while compiling cleanly on standard CI SDK 35.
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
-        // WHY: Restrict ABI strictly to 64-bit arm64-v8a for the Pixel 6a's Google Tensor GS101.
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
 
         externalNativeBuild {
             cmake {
-                // WHY: Enable ARMv8.2-A dot-product (+dotprod) and FP16 (+fp16) instructions
-                // supported by Tensor GS101's Cortex-X1, Cortex-A76, and Cortex-A55 cores.
                 cppFlags += listOf(
                     "-std=c++17",
                     "-O3",
@@ -95,7 +91,6 @@ android {
 
     packaging {
         jniLibs {
-            // WHY: Keep .so libraries uncompressed and 16 KB page-aligned as required by Android 15-17.
             useLegacyPackaging = false
         }
         resources {
@@ -107,9 +102,6 @@ android {
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-
-    // WHY: Include both Google LiteRT ("Lightartie") and Microsoft ONNX Runtime ("Onyx")
-    // so both model ecosystems run natively with hardware acceleration.
     implementation(libs.litert.core)
     implementation(libs.litert.gpu)
     implementation(libs.litert.support)

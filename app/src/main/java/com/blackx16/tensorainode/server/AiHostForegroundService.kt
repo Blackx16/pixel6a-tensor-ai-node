@@ -21,9 +21,6 @@ import java.io.File
 
 /**
  * Android 17 (API 37) compliant Foreground Service (`connectedDevice|specialUse`).
- *
- * WHY: Keeps the local Wi-Fi OpenAI server and Tensor GS101 inference engine active when the screen
- * turns off, holding a `WIFI_MODE_FULL_LOW_LATENCY` lock so token streaming latency over LAN stays low.
  */
 class AiHostForegroundService : Service() {
 
@@ -89,6 +86,7 @@ class AiHostForegroundService : Service() {
             existing.apiKey = apiKey
         } else {
             val srv = OpenAiHttpServer(
+                context = applicationContext,
                 router = router,
                 apiKey = apiKey,
                 port = port,
@@ -98,8 +96,8 @@ class AiHostForegroundService : Service() {
             httpServer = srv
         }
 
-        val wifiIp = optimizer.getLocalWifiIpAddress()
-        val notification = buildNotification("Hosting at http://$wifiIp:$port/v1 (Bearer key active)")
+        val hostIp = optimizer.getLocalWifiIpAddress()
+        val notification = buildNotification("Hosting on VPN/Wi-Fi at http://$hostIp:$port/v1")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
@@ -174,10 +172,10 @@ class AiHostForegroundService : Service() {
         val nm = getSystemService(NotificationManager::class.java) ?: return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Pixel 6a Local AI Wi-Fi Host",
+            "Pixel 6a Local AI VPN & Wi-Fi Host",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Keeps the local OpenAI Wi-Fi server active on your LAN."
+            description = "Keeps the local OpenAI VPN & Wi-Fi server active."
         }
         nm.createNotificationChannel(channel)
     }
@@ -191,7 +189,7 @@ class AiHostForegroundService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("TensorAI Node (Pixel 6a)")
+            .setContentTitle("TensorAI Node v0.3 (Pixel 6a)")
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.stat_sys_upload_done)
             .setContentIntent(pendingIntent)

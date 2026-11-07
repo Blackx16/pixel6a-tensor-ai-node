@@ -16,6 +16,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -55,7 +56,9 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * Ultra-minimal, zero-bloat native Android View frontend (<5 MB RAM overhead, 0% idle CPU).
+ * Ultra-minimal, zero-bloat native Android View frontend (<5 MB RAM overhead, 0% idle CPU)
+ * upgraded in v0.3 with Universal Multi-User VPN Mesh detection (Tailscale 100.64.0.0/10,
+ * WireGuard, ZeroTier, OpenVPN) and one-tap GitHub Pages VPN pairing links.
  */
 class MainActivity : Activity() {
 
@@ -64,8 +67,6 @@ class MainActivity : Activity() {
         private const val REQ_PICK_IMAGE = 1002
     }
 
-    // WHY: Attach a CoroutineExceptionHandler to the UI scope so no unhandled runtime/JNI error
-    // inside any child coroutine can ever crash the Activity.
     private val crashGuardHandler = CoroutineExceptionHandler { _, throwable ->
         runOnUiThread {
             if (::testOutputTextView.isInitialized) {
@@ -166,7 +167,7 @@ class MainActivity : Activity() {
         scroll.addView(root)
 
         root.addView(
-            makeSectionTitle("PIXEL 6A TENSOR GS101 • ANDROID 17 (API 37)")
+            makeSectionTitle("PIXEL 6A TENSOR GS101 • v0.3 UNIVERSAL VPN & WI-FI NODE")
         )
         telemetryTextView = makeMonoText(
             "SoC: Google Tensor GS101 (2x X1 + 2x A76 @ 0xF0) | GPU: Mali-G78 MP20\n" +
@@ -174,13 +175,13 @@ class MainActivity : Activity() {
         )
         root.addView(makeCard(telemetryTextView))
 
-        // 1. Local Wi-Fi OpenAI Host Section
-        root.addView(makeSectionTitle("1. LOCAL WI-FI OPENAI API HOST"))
+        // 1. Universal Multi-VPN & Local Wi-Fi OpenAI Host Section
+        root.addView(makeSectionTitle("1. UNIVERSAL VPN (TAILSCALE/WG/OVPN) & WI-FI HOST"))
         val serverCardLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
         serverStatusTextView = makeMonoText("Server Status: STOPPED")
-        endpointTextView = makeMonoText("Endpoint: http://0.0.0.0:8080/v1")
+        endpointTextView = makeMonoText("Scanning VPN (tun0/wg0/100.64/10) & Wi-Fi (wlan0) interfaces...")
         serverCardLayout.addView(serverStatusTextView)
         serverCardLayout.addView(endpointTextView)
 
@@ -190,7 +191,7 @@ class MainActivity : Activity() {
         val serverBtnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
-        toggleServerBtn = makeButton("START WI-FI SERVER", "#238636") {
+        toggleServerBtn = makeButton("START VPN/WI-FI SERVER", "#238636") {
             toggleOpenAiServer()
         }
         val copyCurlBtn = makeButton("COPY CURL", "#1F6FEB") {
@@ -198,13 +199,38 @@ class MainActivity : Activity() {
         }
         serverBtnRow.addView(
             toggleServerBtn,
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = dp(6) }
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f).apply { rightMargin = dp(6) }
         )
         serverBtnRow.addView(
             copyCurlBtn,
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.8f)
         )
         serverCardLayout.addView(serverBtnRow)
+
+        // VPN Launcher + GitHub.io Pairing Link Row
+        val vpnActionRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(6) }
+        }
+        val openVpnAppBtn = makeButton("OPEN VPN APP", "#30363D") {
+            launchVpnClientOrSettings()
+        }
+        val shareGithubIoBtn = makeButton("SHARE GITHUB.IO VPN LINK", "#8957E5") {
+            shareGithubPagesVpnLink()
+        }
+        vpnActionRow.addView(
+            openVpnAppBtn,
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.9f).apply { rightMargin = dp(6) }
+        )
+        vpnActionRow.addView(
+            shareGithubIoBtn,
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.3f)
+        )
+        serverCardLayout.addView(vpnActionRow)
+
         root.addView(makeCard(serverCardLayout))
 
         // 2. Post-Install Web Model Downloader Section
@@ -290,7 +316,6 @@ class MainActivity : Activity() {
         attachmentStatusText = makeMonoText("Attachments: None (Text-only)")
         testLayout.addView(attachmentStatusText)
 
-        // Thumbnail preview + Clear Image button for Vision & Image Embedding inspection
         imagePreviewView = ImageView(this).apply {
             visibility = View.GONE
             adjustViewBounds = true
@@ -351,19 +376,20 @@ class MainActivity : Activity() {
                 val svc = boundService
                 if (svc != null) {
                     val mem = svc.optimizer.readMemoryTelemetry()
-                    val ip = svc.optimizer.getLocalWifiIpAddress()
                     val srvRunning = svc.httpServer?.isRunning == true
+                    val vpnActive = svc.optimizer.isSystemVpnTransportActive() ||
+                        svc.optimizer.scanAllNetworkEndpoints().any { it.isVpnTunnel }
                     telemetryTextView.text =
-                        "SoC: Tensor GS101 (4x Big Cores 0xF0 Pinned) | Page: ${mem.pageSizeBytes} B\n" +
+                        "SoC: Tensor GS101 (4x Big Cores 0xF0) | VPN Transport: ${if (vpnActive) "ACTIVE (tun0)" else "Standby"}\n" +
                         "RAM Free: ${mem.availableDeviceRamMb}/${mem.totalDeviceRamMb} MB | " +
                         "AnonRSS: ${mem.rssAnonMb} MB | mmap(RssFile): ${mem.rssFileMmapMb} MB"
-                    endpointTextView.text = "Wi-Fi Endpoint: http://$ip:8080/v1"
+                    endpointTextView.text = svc.optimizer.getVpnAndWifiSummary(8080)
                     serverStatusTextView.text = if (srvRunning) {
-                        "Server Status: ACTIVE ON LOCAL WI-FI (Port 8080)"
+                        "Server Status: ACTIVE ON ALL VPN & WI-FI INTERFACES (0.0.0.0:8080)"
                     } else {
                         "Server Status: STOPPED"
                     }
-                    toggleServerBtn.text = if (srvRunning) "STOP WI-FI SERVER" else "START WI-FI SERVER"
+                    toggleServerBtn.text = if (srvRunning) "STOP VPN/WI-FI SERVER" else "START VPN/WI-FI SERVER"
                 }
                 delay(2000L)
             }
@@ -393,25 +419,73 @@ class MainActivity : Activity() {
 
     private fun refreshServerUi() {
         val svc = boundService ?: return
-        val ip = svc.optimizer.getLocalWifiIpAddress()
         val running = svc.httpServer?.isRunning == true
-        endpointTextView.text = "Wi-Fi Endpoint: http://$ip:8080/v1"
+        endpointTextView.text = svc.optimizer.getVpnAndWifiSummary(8080)
         serverStatusTextView.text = if (running) {
-            "Server Status: ACTIVE ON LOCAL WI-FI (Port 8080)"
+            "Server Status: ACTIVE ON ALL VPN & WI-FI INTERFACES (0.0.0.0:8080)"
         } else {
             "Server Status: STOPPED"
         }
-        toggleServerBtn.text = if (running) "STOP WI-FI SERVER" else "START WI-FI SERVER"
+        toggleServerBtn.text = if (running) "STOP VPN/WI-FI SERVER" else "START VPN/WI-FI SERVER"
+    }
+
+    /**
+     * WHY: Detects installed mesh VPN apps (Tailscale, WireGuard, ZeroTier, OpenVPN) and opens
+     * them directly, or falls back to Android's system VPN settings screen.
+     */
+    private fun launchVpnClientOrSettings() {
+        val vpnPackages = listOf(
+            "com.tailscale.ipn",
+            "com.wireguard.android",
+            "com.zerotier.one",
+            "net.openvpn.openvpn",
+            "de.blinkt.openvpn"
+        )
+        for (pkg in vpnPackages) {
+            val launchIntent = packageManager.getLaunchIntentForPackage(pkg)
+            if (launchIntent != null) {
+                startActivity(launchIntent)
+                return
+            }
+        }
+        try {
+            startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+        } catch (_: Throwable) {
+            Toast.makeText(this, "Install Tailscale, WireGuard, or OpenVPN to start a VPN tunnel", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /**
+     * WHY: Generates a zero-leakage URL hash link (`#vpn=<vpn_ip>:8080&key=<key>&proto=tailscale`)
+     * for `https://blackx16.github.io/pixel6a-tensor-ai-node/` so the user can open their personal
+     * VPN-connected Web Console on any laptop/phone without exposing their IP or key to GitHub's servers.
+     */
+    private fun shareGithubPagesVpnLink() {
+        val svc = boundService ?: return
+        val ip = svc.optimizer.getLocalWifiIpAddress()
+        val key = apiKeyInput.text.toString().trim().ifBlank { "sk-pixel6a-tensor" }
+        val proto = if (ip.startsWith("100.")) "tailscale" else if (ip.startsWith("10.")) "wireguard" else "wifi"
+        val url = "https://blackx16.github.io/pixel6a-tensor-ai-node/#vpn=$ip:8080&key=$key&proto=$proto"
+
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        cm?.setPrimaryClip(ClipData.newPlainText("GitHub.io VPN Link", url))
+        Toast.makeText(this, "Copied GitHub.io VPN pairing link!", Toast.LENGTH_SHORT).show()
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, url)
+        }
+        startActivity(Intent.createChooser(shareIntent, "Share Universal VPN Web Console Link"))
     }
 
     private fun copySampleCurlToClipboard() {
         val svc = boundService ?: return
         val ip = svc.optimizer.getLocalWifiIpAddress()
         val key = apiKeyInput.text.toString().trim().ifBlank { "sk-pixel6a-tensor" }
-        val curl = "curl http://$ip:8080/v1/chat/completions -H \"Authorization: Bearer $key\" -H \"Content-Type: application/json\" -d '{\"model\":\"${ModelCatalog.PRIMARY_LITERT_LLM_ID}\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello from LAN!\"}],\"stream\":true}'"
+        val curl = "curl http://$ip:8080/v1/chat/completions -H \"Authorization: Bearer $key\" -H \"Content-Type: application/json\" -d '{\"model\":\"${ModelCatalog.PRIMARY_LITERT_LLM_ID}\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello over VPN!\"}],\"stream\":true}'"
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         cm?.setPrimaryClip(ClipData.newPlainText("OpenAI cURL", curl))
-        Toast.makeText(this, "Copied OpenAI cURL command to clipboard", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Copied OpenAI cURL command for $ip:8080", Toast.LENGTH_SHORT).show()
     }
 
     private fun rebuildModelCards() {
@@ -513,11 +587,6 @@ class MainActivity : Activity() {
         startActivityForResult(Intent.createChooser(intent, "Select Image for Vision Test"), REQ_PICK_IMAGE)
     }
 
-    /**
-     * WHY: Immediately decodes a thumbnail preview AND computes the 384-D Visual Embedding +
-     * Scene/Color/Edge analysis on the selected image so the user sees the image output right away
-     * without waiting or wondering if the image was processed.
-     */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQ_PICK_IMAGE && resultCode == RESULT_OK) {
@@ -601,11 +670,6 @@ class MainActivity : Activity() {
         speechRecognizer?.startListening(recognizerIntent)
     }
 
-    /**
-     * WHY: Auto-detects whether the selected model is an Embedding model (`all-minilm-l6-v2-onnx`,
-     * `universal-sentence-encoder-litert`), Voice ASR (`whisper-tiny-int8-onnx`), or Chat/Vision LLM,
-     * and wraps execution in `try/catch (Throwable)` so "RUN ON PHONE" never crashes the app.
-     */
     private fun runDirectOnDeviceTest() {
         val svc = boundService
         if (svc == null) {
@@ -620,7 +684,6 @@ class MainActivity : Activity() {
         val rawModeIdx = testModeSpinner.selectedItemPosition
         val prompt = testPromptInput.text.toString().trim()
 
-        // Auto-route to Embeddings mode if an embedding model is selected in Spinner 1
         val effectiveMode = when {
             rawModeIdx == 1 -> 1
             rawModeIdx == 2 -> 2

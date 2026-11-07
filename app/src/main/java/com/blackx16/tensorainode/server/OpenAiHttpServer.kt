@@ -1,5 +1,6 @@
 package com.blackx16.tensorainode.server
 
+import android.content.Context
 import android.util.Base64
 import com.blackx16.tensorainode.engine.ChatCompletionRequest
 import com.blackx16.tensorainode.engine.ChatMessageInput
@@ -25,13 +26,19 @@ import java.util.UUID
 
 /**
  * Ultra-lightweight (<1 MB RAM overhead), zero-dependency OpenAI-compatible HTTP/1.1 Server
- * designed to run on the Pixel 6a's local Wi-Fi interface (`0.0.0.0:<port>`).
+ * designed to run across ALL Pixel 6a interfaces (`0.0.0.0:<port>`), simultaneously serving:
+ * - Tailscale (`100.64.0.0/10` on `tun0`)
+ * - WireGuard (`wg0` / `tun0`)
+ * - ZeroTier (`zt*` / `tun0`)
+ * - OpenVPN (`tun0` / `tap0`)
+ * - Local Wi-Fi (`wlan0`)
  *
- * WHY: Includes W3C Private Network Access (`Access-Control-Allow-Private-Network: true`) and
- * CORS preflight headers so the GitHub Pages web console (`https://blackx16.github.io/pixel6a-tensor-ai-node/`)
- * can connect directly over local Wi-Fi, and also serves a built-in redirect/status landing page at `GET /`.
+ * WHY: Serves the full bundled `assets/web/index.html` at `GET /` so any user on a VPN can either
+ * connect via `https://blackx16.github.io/pixel6a-tensor-ai-node/` OR open `http://<vpn-ip>:8080/`
+ * directly inside their encrypted tunnel without HTTPS-to-HTTP mixed-content blocks.
  */
 class OpenAiHttpServer(
+    private val context: Context,
     private val router: UnifiedAiRouter,
     @Volatile var apiKey: String = "sk-pixel6a-tensor",
     val port: Int = 8080,
@@ -94,37 +101,56 @@ class OpenAiHttpServer(
             }
 
             if (request.method == "GET" && (request.path == "/" || request.path == "/index.html")) {
-                val wifiIp = router.optimizer.getLocalWifiIpAddress()
-                val html = """
-                    <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-                    <title>Pixel 6a TensorAI Node</title></head>
+                val htmlBytes = try {
+                    context.assets.open("web/index.html").use { it.readBytes() }
+                } catch (_: Throwable) {
+                    val hostIp = router.optimizer.getLocalWifiIpAddress()
+                    """
+                    <!DOCTYPE html><html><head><meta charset="utf-8"><title>Pixel 6a TensorAI Node v0.3</title></head>
                     <body style="background:#0b0f17;color:#e6edf3;font-family:monospace;padding:24px;">
-                    <h2 style="color:#58a6ff;">Pixel 6a TensorAI Node is LIVE on Local Wi-Fi</h2>
-                    <p>OpenAI Base URL: <code>http://$wifiIp:$port/v1</code></p>
-                    <p>Web Console (GitHub Pages): <a style="color:#3fb950;" href="https://blackx16.github.io/pixel6a-tensor-ai-node/?host=$wifiIp:$port">https://blackx16.github.io/pixel6a-tensor-ai-node/?host=$wifiIp:$port</a></p>
+                    <h2 style="color:#3fb950;">Pixel 6a TensorAI Node v0.3 (VPN &amp; Wi-Fi Active)</h2>
+                    <p>OpenAI Base URL: <code>http://$hostIp:$port/v1</code></p>
+                    <p>Universal GitHub Pages Console: <a style="color:#58a6ff;" href="https://blackx16.github.io/pixel6a-tensor-ai-node/#vpn=$hostIp:$port">https://blackx16.github.io/pixel6a-tensor-ai-node/#vpn=$hostIp:$port</a></p>
                     </body></html>
-                """.trimIndent().toByteArray(Charsets.UTF_8)
+                    """.trimIndent().toByteArray(Charsets.UTF_8)
+                }
                 val headers = buildString {
                     append("HTTP/1.1 200 OK\r\n")
                     append("Content-Type: text/html; charset=utf-8\r\n")
-                    append("Content-Length: ${html.size}\r\n")
+                    append("Content-Length: ${htmlBytes.size}\r\n")
                     append("Access-Control-Allow-Origin: *\r\n")
                     append("Access-Control-Allow-Private-Network: true\r\n")
                     append("Connection: close\r\n\r\n")
                 }
                 output.write(headers.toByteArray(Charsets.UTF_8))
-                output.write(html)
+                output.write(htmlBytes)
                 output.flush()
                 return
             }
 
             if (request.path == "/health") {
                 val mem = router.optimizer.readMemoryTelemetry()
+                val endpoints = router.optimizer.scanAllNetworkEndpoints()
+                val epArray = JSONArray()
+                endpoints.forEach { ep ->
+                    epArray.put(
+                        JSONObject()
+                            .put("interface", ep.interfaceName)
+                            .put("ip", ep.ipAddress)
+                            .put("label", ep.protocolLabel)
+                            .put("is_vpn", ep.isVpnTunnel)
+                    )
+                }
+                val vpnActive = endpoints.any { it.isVpnTunnel } || router.optimizer.isSystemVpnTransportActive()
                 val healthJson = JSONObject()
                     .put("status", "ok")
+                    .put("version", "0.3.0")
                     .put("device", "Google Pixel 6a (bluejay)")
                     .put("soc", "Google Tensor GS101")
                     .put("os", "Android 17 (API 37 / DP11.261016.003)")
+                    .put("vpn_active", vpnActive)
+                    .put("vpn_status", if (vpnActive) "VPN Tunnel Active" else "Local Wi-Fi Mode")
+                    .put("endpoints", epArray)
                     .put("rss_anon_mb", mem.rssAnonMb)
                     .put("rss_file_mmap_mb", mem.rssFileMmapMb)
                     .toString()
@@ -603,7 +629,7 @@ class OpenAiHttpServer(
                 append("Content-Type: application/json; charset=utf-8\r\n")
                 append("Content-Length: ${payload.size}\r\n")
                 append("Access-Control-Allow-Origin: *\r\n")
-                append("Access-Control-Allow-Headers: Authorization, Content-Type\r\n")
+                append("Access-Control-Allow-Headers: Authorization, Content-Type, X-Tensor-VPN-Mode\r\n")
                 append("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n")
                 append("Access-Control-Allow-Private-Network: true\r\n")
                 append("Connection: close\r\n\r\n")
